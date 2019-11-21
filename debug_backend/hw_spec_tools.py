@@ -47,22 +47,23 @@ def get_gdb(chip_name=None,
     Gdb
     """
     if chip_name in get_hw_list():
-        _oocd = _str_to_class("Gdb" + chip_name)
+        _gdb = _str_to_class("Gdb" + chip_name)
     else:
-        _oocd = Gdb
+        _gdb = Gdb
 
-    return Gdb(gdb_path=gdb_path,
-               log_level=log_level,
-               log_stream_handler=log_stream_handler,
-               log_file_handler=log_file_handler,
-               log_gdb_proc_file=log_gdb_proc_file,
-               remote_target=remote_target,
-               remote_address=remote_address,
-               remote_port=remote_port, **kwargs)
+    return _gdb(gdb_path=gdb_path,
+                log_level=log_level,
+                log_stream_handler=log_stream_handler,
+                log_file_handler=log_file_handler,
+                log_gdb_proc_file=log_gdb_proc_file,
+                remote_target=remote_target,
+                remote_address=remote_address,
+                remote_port=remote_port, **kwargs)
 
 
 def get_oocd(chip_name=None,
              oocd_exec=None,
+             oocd_scripts=None,
              oocd_args=None,
              ip=None,
              log_level=None,
@@ -76,6 +77,7 @@ def get_oocd(chip_name=None,
     ----------
     chip_name : Any(None, str)
     oocd_exec : Any(None, str)
+    oocd_scripts : Any(None, str)
     oocd_args : Any(None, str)
     ip : Any(None, str)
     log_level : Any(None, str)
@@ -92,6 +94,7 @@ def get_oocd(chip_name=None,
         _oocd = Oocd
     return _oocd(chip_name=chip_name,
                  oocd_exec=oocd_exec,
+                 oocd_scripts=oocd_scripts,
                  oocd_args=oocd_args,
                  ip=ip,
                  log_level=log_level,

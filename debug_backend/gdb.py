@@ -170,7 +170,7 @@ class Gdb:
         res, res_body = self._parse_mi_resp(response, new_tgt_state)  # None, None if empty
         while not res:
             # check for result report from GDB
-            response = self._gdbmi.get_gdb_response(1, raise_error_on_timeout=False)
+            response = self._gdbmi.get_gdb_response(0, raise_error_on_timeout=False)
             if not len(response):
                 if tmo and (time.time() >= end):
                     raise DebuggerTargetStateTimeoutError(
@@ -202,25 +202,6 @@ class Gdb:
         if action == 'halt':
             self.wait_target_state(TARGET_STATE_STOPPED, 5)
             self.console_cmd_run('flushregs')
-
-    def target_program(self, file_name, off, actions='verify', tmo=30):
-        """
-
-        actions can be any or both of 'verify reset'
-
-        Parameters
-        ----------
-        file_name : str
-        off : str
-        actions : str
-        tmo : int
-
-        """
-        local_file_path = file_name
-        if os.name == 'nt':
-            # Convert filepath from Windows format if needed
-            local_file_path = local_file_path.replace("\\", "/")
-        self.monitor_run('program_esp32 %s %s 0x%x' % (local_file_path, actions, int(off)), tmo)
 
     def exec_file_set(self, file_path):
         # -file-exec-and-symbols file
@@ -319,7 +300,7 @@ class Gdb:
     def get_local_variables(self, no_values=False):
         # -stack-list-variables [ --no-frame-filters ] [ --skip-unavailable ] print-values
         # noinspection PyTypeChecker
-        cmd = '-stack-list-locals %i' % int(no_values)
+        cmd = '-stack-list-locals %i' % int(not no_values)
         res, res_body = self._mi_cmd_run(cmd)
         if res != 'done' or not res_body or 'locals' not in res_body:
             raise DebuggerError('Failed to get variables @ frame')
@@ -472,4 +453,10 @@ class Gdb:
         for th in ths:
             if th['id'] == sel_id:
                 return th
+        return None
+
+    def set_app_offset(self, **kwargs):
+        return None
+
+    def target_program(self, **kwargs):
         return None
