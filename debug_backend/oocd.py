@@ -22,6 +22,7 @@ class Oocd(threading.Thread):
 
     def __init__(self, chip_name=None,
                  oocd_exec=None,
+                 oocd_scripts=None,
                  oocd_args=None,
                  ip=None,
                  log_level=None,
@@ -29,6 +30,22 @@ class Oocd(threading.Thread):
                  log_file_handler=None,
                  top_defaults=None,
                  **kwargs):
+        """
+
+        Parameters
+        ----------
+        chip_name
+        oocd_exec
+            use "" value for pass openocd's subprocess creation
+        oocd_scripts
+        oocd_args
+        ip
+        log_level
+        log_stream_handler
+        log_file_handler
+        top_defaults
+        kwargs
+        """
         defaults = {
             "chip_name": CHIP_NAME_NA,
             "oocd_exec": os.environ.get("OPENOCD_BIN", "openocd"),
@@ -42,20 +59,23 @@ class Oocd(threading.Thread):
 
         chip_name = self.get_config("chip_name", chip_name)
         oocd_exec = self.get_config("oocd_exec", oocd_exec)
+
+        oocd_scripts = self.get_config("oocd_scripts", oocd_scripts)
         oocd_args = self.get_config("oocd_args", oocd_args)
+
         ip = self.get_config("ip", ip)
         log_level = self.get_config("log_level", log_level)
         log_stream_handler = self.get_config("log_stream_handler", log_stream_handler)
         log_file_handler = self.get_config("log_file_handler", log_file_handler)
 
-        if oocd_args is None:
-            oocd_args = []
-        for c in kwargs.get('oocd_cfg_cmds', []):
-            oocd_args += ['-c', '%s' % c]
-        if kwargs.get('oocd_tcl_dir'):
-            oocd_args += ['-s', kwargs.get('oocd_tcl_dir')]
-        for f in kwargs.get('oocd_cfg_files', []):
-            oocd_args += ['-f', f]
+        oocd_full_args = []
+        if oocd_scripts is None:
+            oocd_scripts = os.environ.get("OPENOCD_SCRIPTS", None)
+            if oocd_scripts is not None:
+                oocd_full_args += ['-s', oocd_scripts]
+
+        oocd_full_args += oocd_args
+
         self.chip_name = chip_name
         self.do_work = True
         ip_binary = ip.encode('utf-8')
@@ -63,28 +83,37 @@ class Oocd(threading.Thread):
             self._logger = log.logger_init('OpenOCD', log_level, log_stream_handler, log_file_handler)
         self._logger.debug('Start OpenOCD: {%s}', oocd_args)
 
-        if oocd_exec is not None:
-            self._oocd_proc = subprocess.Popen(
-                bufsize=0, args=[oocd_exec] + oocd_args,
-                stdin=None, stdout=self.STDOUT_DEST, stderr=subprocess.STDOUT,
-                creationflags=self.CREATION_FLAGS, universal_newlines=True
-            )
-            time.sleep(1)
-        self._logger.debug('Open telnet conn...')
-        try:
-            self._tn = telnetlib.Telnet(ip_binary, self.OOCD_TELNET_PORT, 5)
-            self._tn.read_until(b'>', 5)
-        except Exception as e:
-            self._logger.error('Failed to open telnet connection!')
-            if oocd_exec is not None:
-                if self._oocd_proc.stdout:
-                    out = self._oocd_proc.stdout.read()
-                    self._logger.debug(
-                        '================== OOCD OUTPUT START =================\n'
-                        '%s================== OOCD OUTPUT END =================\n',
-                        out)
-                self._oocd_proc.terminate()
-            raise e
+        if oocd_exec != "":  # if oocd_exec is not empty - run
+            try:
+                self._oocd_proc = subprocess.Popen(
+                    bufsize=0, args=[oocd_exec] + oocd_full_args,
+                    stdin=None, stdout=self.STDOUT_DEST, stderr=subprocess.STDOUT,
+                    creationflags=self.CREATION_FLAGS, universal_newlines=True
+                )
+                time.sleep(1)
+            except FileNotFoundError:
+                self._logger.error("OpenOCD exec file is not found!")
+                raise FileNotFoundError("OpenOCD exec file is not found!")
+            if self._oocd_proc.poll() is not None:
+                self._logger.error("Failed to start telnet connection with OpenOCD cause it's closed!")
+                self._logger.error(self._oocd_proc.stdout.read())
+                raise ProcessLookupError("OpenOCD is closed!")
+        else:
+            self._logger.debug('Open telnet conn...')
+            try:
+                self._tn = telnetlib.Telnet(ip_binary, self.OOCD_TELNET_PORT, 5)
+                self._tn.read_until(b'>', 5)
+            except Exception as e:
+                self._logger.error('Failed to open telnet connection with OpenOCD!')
+                if oocd_exec is not None:
+                    if self._oocd_proc.stdout:
+                        out = self._oocd_proc.stdout.read()
+                        self._logger.debug(
+                            '================== OOCD OUTPUT START =================\n'
+                            '%s================== OOCD OUTPUT END =================\n',
+                            out)
+                    self._oocd_proc.terminate()
+                raise e
 
     def run(self):
         while self._oocd_proc.stdout and self.do_work:

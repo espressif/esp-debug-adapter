@@ -4,8 +4,8 @@ from ..gdb import Gdb
 
 
 class OocdXtensa(Oocd):
-    def __init__(self, chip_name=None, oocd_exec=None, oocd_args=None, ip=None, log_level=None, log_stream_handler=None,
-                 log_file_handler=None, top_defaults=None, **kwargs):
+    def __init__(self, chip_name=None, oocd_exec=None, oocd_scripts=None, oocd_args=None, ip=None, log_level=None,
+                 log_stream_handler=None, log_file_handler=None, top_defaults=None, **kwargs):
 
         defaults = {
             "chip_name": "Xtensa"
@@ -13,8 +13,8 @@ class OocdXtensa(Oocd):
         self.config = defaults  # type: dict
         if top_defaults:
             self.config.update(top_defaults)
-        super().__init__(chip_name=chip_name, oocd_exec=oocd_exec, oocd_args=oocd_args, ip=ip,
-                         log_level=log_level, log_stream_handler=log_stream_handler,
+        super().__init__(chip_name=chip_name, oocd_exec=oocd_exec, oocd_scripts=oocd_scripts, oocd_args=oocd_args,
+                         ip=ip, log_level=log_level, log_stream_handler=log_stream_handler,
                          log_file_handler=log_file_handler, top_defaults=self.config, **kwargs)
 
     def perfmon_enable(self, counter, select, mask=None, kernelcnt=None, tracelevel=None):
