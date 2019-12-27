@@ -23,4 +23,5 @@ def logger_init(log_name="Log", log_level=None, stream_handler=None, file_handle
         logger.addHandler(stream_handler)
     if file_handler:
         logger.addHandler(file_handler)
+    logger.propagate = False
     return logger
