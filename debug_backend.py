@@ -11,16 +11,16 @@ from pygdbmi.gdbcontroller import GdbController
 from pygdbmi.gdbcontroller import GdbTimeoutError
 from pprint import pformat
 
-
 OOCD_PORT = 3333
 toolchain = 'none'
-_oocd_inst   = None
-_gdb_inst    = None
+_oocd_inst = None
+_gdb_inst = None
 
 if os.name == 'nt':
     OS_INT_SIG = signal.CTRL_C_EVENT
 else:
     OS_INT_SIG = signal.SIGINT
+
 
 def start(toolch, oocd_path, oocd_tcl_dir, oocd_cfg_files, oocd_cfg_cmds=[], oocd_dbg_level=2):
     global _oocd_inst
@@ -46,12 +46,15 @@ def start(toolch, oocd_path, oocd_tcl_dir, oocd_cfg_files, oocd_cfg_cmds=[], ooc
         _oocd_inst.join()
         raise e
 
+
 def stop():
     _oocd_inst.stop()
     Oocd.get_logger().debug('Debug backend finished')
 
+
 def get_gdb():
     return _gdb_inst
+
 
 def get_oocd():
     return _oocd_inst
@@ -64,14 +67,16 @@ class DebuggerError(RuntimeError):
 class DebuggerTargetStateTimeoutError(DebuggerError):
     pass
 
+
 # This function needs to be called for paths passed to OOCD or GDB commands.
-# API handles this automatically but ut should be used when if user composes commands himself, e.g. for Gdb.monitor_run().
+# API handles this automatically but ut should be used when if user composes commands himself,
+# e.g. for Gdb.monitor_run().
 # It makes paths portable across Windows and Linux versions of the tools.
 def fixup_path(path):
     file_path = path
     if os.name == 'nt':
         # Convert filepath from Windows format if needed
-        file_path = file_path.replace("\\","/");
+        file_path = file_path.replace("\\", "/")
     return file_path
 
 
@@ -99,10 +104,10 @@ class Oocd(threading.Thread):
         self._logger = self.get_logger()
         self._logger.debug('Start OpenOCD: {%s}', oocd_args)
         self._oocd_proc = subprocess.Popen(
-                bufsize=0, args=[oocd_path]+oocd_args,
-                stdin=None, stdout=self.STDOUT_DEST, stderr=subprocess.STDOUT,
-                creationflags=self.CREATION_FLAGS
-                )
+            bufsize=0, args=[oocd_path] + oocd_args,
+            stdin=None, stdout=self.STDOUT_DEST, stderr=subprocess.STDOUT,
+            creationflags=self.CREATION_FLAGS
+        )
         time.sleep(1)
         self._logger.debug('Open telnet conn...')
         try:
@@ -112,7 +117,10 @@ class Oocd(threading.Thread):
             self._logger.error('Failed to open telnet connection!')
             if self._oocd_proc.stdout:
                 out = self._oocd_proc.stdout.read()
-                self._logger.debug('================== OOCD OUTPUT START =================\n%s================== OOCD OUTPUT END =================\n', out)
+                self._logger.debug(
+                    '================== OOCD OUTPUT START =================\n'
+                    '%s================== OOCD OUTPUT END =================\n',
+                    out)
             self._oocd_proc.terminate()
             raise e
 
@@ -145,11 +153,11 @@ class Oocd(threading.Thread):
         self._tn.write(cmd_sent)
         resp = self._tn.read_until('>')
         # remove all '\r' first
-        resp = resp.replace('\r','')
+        resp = resp.replace('\r', '')
         # command we sent will be echoed back - remove it
         index_start = resp.find(cmd_sent)
         if index_start >= 0:
-            resp = resp[index_start+len(cmd_sent):]
+            resp = resp[index_start + len(cmd_sent):]
         # the response will also include '>', next prompt - remove it as well
         index_end = resp.rfind('>')
         if index_end >= 0:
@@ -168,7 +176,7 @@ class Oocd(threading.Thread):
     def semihost_basedir_set(self, semi_dir):
         self.cmd_exec('%s semihost_basedir %s' % (self.current_target_name_get(), fixup_path(semi_dir)))
 
-    def perfmon_enable(self, counter, select, mask = None, kernelcnt = None, tracelevel = None):
+    def perfmon_enable(self, counter, select, mask=None, kernelcnt=None, tracelevel=None):
         """Run OpenOCD perfmon_enable command, which starts performance counter
 
         counter: performance counter ID
@@ -187,7 +195,7 @@ class Oocd(threading.Thread):
             cmd += ' %d' % tracelevel
         self.cmd_exec(cmd)
 
-    def perfmon_dump(self, counter = None):
+    def perfmon_dump(self, counter=None):
         """Run OpenOCD perfmon_dump command
 
         Reported results are returned as a dictionary. Each key is the counter id.
@@ -237,20 +245,20 @@ class Gdb:
     TARGET_STATE_STOPPED = 1
     TARGET_STATE_RUNNING = 2
     # Target stop reasons
-    TARGET_STOP_REASON_UNKNOWN  = 0
-    TARGET_STOP_REASON_SIGINT   = 1
-    TARGET_STOP_REASON_SIGTRAP  = 2
-    TARGET_STOP_REASON_BP       = 3
-    TARGET_STOP_REASON_WP       = 4
+    TARGET_STOP_REASON_UNKNOWN = 0
+    TARGET_STOP_REASON_SIGINT = 1
+    TARGET_STOP_REASON_SIGTRAP = 2
+    TARGET_STOP_REASON_BP = 3
+    TARGET_STOP_REASON_WP = 4
     TARGET_STOP_REASON_WP_SCOPE = 5
-    TARGET_STOP_REASON_STEPPED  = 6
+    TARGET_STOP_REASON_STEPPED = 6
     TARGET_STOP_REASON_FN_FINISHED = 7
 
     @staticmethod
     def get_logger():
         return logging.getLogger('Gdb')
 
-    def __init__(self, gdb = None):
+    def __init__(self, gdb=None):
         # Start gdb process
         self._logger = self.get_logger()
         if os.name == 'nt':
@@ -326,7 +334,7 @@ class Gdb:
         # cache unprocessed records
         self._resp_cache = resp[processed_recs:]
         # self._logger.debug('cached recs: %s', pformat(self._resp_cache))
-        return result,result_body
+        return result, result_body
 
     def _mi_cmd_run(self, cmd, new_tgt_state=None, tmo=5):
         self._logger.debug('MI->: %s', cmd)
@@ -341,24 +349,25 @@ class Gdb:
             while len(response) == 0:
                 response = self._gdbmi.write(cmd, raise_error_on_timeout=False)
         self._logger.debug('MI<-:\n%s', pformat(response))
-        res,res_body = self._parse_mi_resp(response, new_tgt_state)
+        res, res_body = self._parse_mi_resp(response, new_tgt_state)
         while not res:
             # check for result report from GDB
-            response = self._gdbmi.get_gdb_response(1, raise_error_on_timeout = False)
+            response = self._gdbmi.get_gdb_response(1, raise_error_on_timeout=False)
             if len(response) == 0:
                 if tmo and (time.time() >= end):
-                    raise DebuggerTargetStateTimeoutError('Failed to wait for completion of command "%s" / %s!' % (cmd, tmo))
+                    raise DebuggerTargetStateTimeoutError(
+                        'Failed to wait for completion of command "%s" / %s!' % (cmd, tmo))
             else:
                 self._logger.debug('MI<-:\n%s', pformat(response))
-                res,res_body = self._parse_mi_resp(response, new_tgt_state)
-        return res,res_body
+                res, res_body = self._parse_mi_resp(response, new_tgt_state)
+        return res, res_body
 
     def console_cmd_run(self, cmd):
         self._mi_cmd_run('-interpreter-exec console %s' % cmd)
 
     def target_select(self, tgt_type, tgt_params):
         # -target-select type parameters
-        res,_ = self._mi_cmd_run('-target-select %s %s' % (tgt_type, tgt_params))
+        res, _ = self._mi_cmd_run('-target-select %s %s' % (tgt_type, tgt_params))
         if res != 'connected':
             raise DebuggerError('Failed to connect to "%s %s"!' % (tgt_type, tgt_params))
 
@@ -382,7 +391,7 @@ class Gdb:
     def exec_file_set(self, file_path):
         # -file-exec-and-symbols file
         self._logger.debug('exec_file_set %s' % file_path)
-        res,_ = self._mi_cmd_run('-file-exec-and-symbols %s' % fixup_path(file_path))
+        res, _ = self._mi_cmd_run('-file-exec-and-symbols %s' % fixup_path(file_path))
         if res != 'done':
             raise DebuggerError('Failed to set program file!')
 
@@ -399,43 +408,43 @@ class Gdb:
 
     def exec_continue(self):
         # -exec-continue [--reverse] [--all|--thread-group N]
-        res,_ = self._mi_cmd_run('-exec-continue --all')
+        res, _ = self._mi_cmd_run('-exec-continue --all')
         if res != 'running':
             raise DebuggerError('Failed to continue program!')
 
     def exec_jump(self, loc):
         # -exec-jump location
-        res,_ = self._mi_cmd_run('-exec-jump %s' % loc)
+        res, _ = self._mi_cmd_run('-exec-jump %s' % loc)
         if res != 'running':
             raise DebuggerError('Failed to make jump in program!')
 
     def exec_next(self):
         # -exec-next [--reverse]
-        res,_ = self._mi_cmd_run('-exec-next')
+        res, _ = self._mi_cmd_run('-exec-next')
         if res != 'running':
             raise DebuggerError('Failed to step over!')
 
     def exec_step(self):
         # -exec-step [--reverse]
-        res,_ = self._mi_cmd_run('-exec-step')
+        res, _ = self._mi_cmd_run('-exec-step')
         if res != 'running':
             raise DebuggerError('Failed to step in!')
 
     def exec_finish(self):
         # -exec-finish [--reverse]
-        res,_ = self._mi_cmd_run('-exec-finish')
+        res, _ = self._mi_cmd_run('-exec-finish')
         if res != 'running':
             raise DebuggerError('Failed to step out!')
 
     def exec_next_insn(self):
         # -exec-next-instruction [--reverse]
-        res,_ = self._mi_cmd_run('-exec-next-instruction')
+        res, _ = self._mi_cmd_run('-exec-next-instruction')
         if res != 'running':
             raise DebuggerError('Failed to step insn!')
 
     def data_eval_expr(self, expr):
         # -data-evaluate-expression expr
-        res,res_body = self._mi_cmd_run('-data-evaluate-expression %s' % expr)
+        res, res_body = self._mi_cmd_run('-data-evaluate-expression %s' % expr)
         if res != 'done' or not res_body or 'value' not in res_body:
             raise DebuggerError('Failed to eval expression!')
         return res_body['value']
@@ -449,27 +458,27 @@ class Gdb:
             sval = sval[:fn_start]
         return int(sval, 0)
 
-    def get_variables_at_frame(self, thread_num=None, frame_num = 0):
+    def get_variables_at_frame(self, thread_num=None, frame_num=0):
         # -stack-list-variables [ --no-frame-filters ] [ --skip-unavailable ] print-values
         if thread_num:
             cmd = '-stack-list-variables --thread %d --frame %d --all-values' % (thread_num, frame_num)
         else:
             cmd = '-stack-list-variables --all-values'
-        res,res_body = self._mi_cmd_run(cmd)
+        res, res_body = self._mi_cmd_run(cmd)
         if res != 'done' or not res_body or 'variables' not in res_body:
             raise DebuggerError('Failed to get variables @ frame %d of thread %d!' % (frame_num, thread_num))
         return res_body['variables']
 
     def get_backtrace(self):
         # -stack-list-frames [ --no-frame-filters low-frame high-frame ]
-        res,res_body = self._mi_cmd_run('-stack-list-frames')
+        res, res_body = self._mi_cmd_run('-stack-list-frames')
         if res != 'done' or not res_body or 'stack' not in res_body:
             raise DebuggerError('Failed to get backtrace!')
         return res_body['stack']
 
     def select_frame(self, frame):
         # -stack-select-frame framenum
-        res,_ = self._mi_cmd_run('-stack-select-frame %d' % frame)
+        res, _ = self._mi_cmd_run('-stack-select-frame %d' % frame)
         if res != 'done':
             raise DebuggerError('Failed to get backtrace!')
 
@@ -478,7 +487,7 @@ class Gdb:
         cmd_args = '-i %d %s' % (ignore_count, loc)
         if len(cond):
             cmd_args = '-c "%s" %s' % (cond, cmd_args)
-        res,res_body = self._mi_cmd_run('-break-insert %s' % cmd_args)
+        res, res_body = self._mi_cmd_run('-break-insert %s' % cmd_args)
         if res != 'done' or not res_body or 'bkpt' not in res_body or 'number' not in res_body['bkpt']:
             raise DebuggerError('Failed to insert BP!')
         return res_body['bkpt']['number']
@@ -490,7 +499,7 @@ class Gdb:
             cmd_args = '-r %s' % cmd_args
         elif tp == 'rw':
             cmd_args = '-a %s' % cmd_args
-        res,res_body = self._mi_cmd_run('-break-watch %s' % cmd_args)
+        res, res_body = self._mi_cmd_run('-break-watch %s' % cmd_args)
         if res != 'done' or not res_body:
             raise DebuggerError('Failed to insert WP!')
         if tp == 'w':
@@ -509,26 +518,26 @@ class Gdb:
 
     def delete_bp(self, bp):
         # -break-delete ( breakpoint )+
-        res,_ = self._mi_cmd_run('-break-delete %s' % bp)
+        res, _ = self._mi_cmd_run('-break-delete %s' % bp)
         if res != 'done':
             raise DebuggerError('Failed to delete BP!')
 
-    def monitor_run(self, cmd, tmo = None):
+    def monitor_run(self, cmd, tmo=None):
         res, resp = self._mi_cmd_run('mon %s' % cmd, tmo=tmo)
         if res != 'done':
             raise DebuggerError('Failed to run monitor cmd "%s"!' % cmd)
         return resp
 
-    def wait_target_state(self, state, tmo = None):
+    def wait_target_state(self, state, tmo=None):
         if tmo:
             end = time.time() + tmo
         while self._target_state != state:
             recs = []
             if len(self._resp_cache):
                 recs = self._resp_cache
-            else :
+            else:
                 # check for target state change report from GDB
-                recs = self._gdbmi.get_gdb_response(1, raise_error_on_timeout = False)
+                recs = self._gdbmi.get_gdb_response(1, raise_error_on_timeout=False)
                 if tmo and len(recs) == 0 and time.time() >= end:
                     raise DebuggerTargetStateTimeoutError("Failed to wait for target state %d!" % state)
             self._parse_mi_resp(recs, state)
@@ -556,13 +565,13 @@ class Gdb:
             cmd = '-thread-info %d' % thread_id
         else:
             cmd = '-thread-info'
-        res,res_body = self._mi_cmd_run(cmd)
+        res, res_body = self._mi_cmd_run(cmd)
         if res != 'done' or not res_body or 'threads' not in res_body or 'current-thread-id' not in res_body:
             raise DebuggerError('Failed to get thread info!')
-        return (res_body['current-thread-id'], res_body['threads'])
+        return res_body['current-thread-id'], res_body['threads']
 
     def set_thread(self, num):
-        res,_ = self._mi_cmd_run('-thread-select %d' % num)
+        res, _ = self._mi_cmd_run('-thread-select %d' % num)
         if res != 'done':
             raise DebuggerError('Failed to set thread!')
         return res

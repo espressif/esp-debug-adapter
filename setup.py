@@ -8,7 +8,7 @@ NAME = 'debug_backend'
 VERSION = '1.0.0'
 SHORT_DESCRIPTION = 'This package provides extented capabilities to interacting with ESP chips via GDB and OpenOCD.'
 LICENSE = 'MIT'
-URL = 'https://gitlab.espressif.cn:6688/alexey/py_debug_backend'
+URL = ''
 PACKAGES = [  # All packages and sub-packages must be listed here
     NAME,
 ]

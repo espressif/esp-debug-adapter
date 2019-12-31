@@ -8,7 +8,7 @@ from pygdbmi.gdbcontroller import GdbController
 from .errors import *
 
 
-class Gdb:
+class Gdb(object):
     def get_config(self, param_name, in_val=None):
         if in_val is not None:
             return in_val
@@ -180,9 +180,9 @@ class Gdb:
                 res, res_body = self._parse_mi_resp(response, new_tgt_state)  # None, None if empty
         return res, res_body
 
-    def stop(self):
-        self.console_cmd_run('quit')
-        # TODO: add a checking if it real stops
+    def gdb_exit(self):
+        """ -gdb-exit ~= quit """
+        self._mi_cmd_run("-gdb-exit")
 
     def console_cmd_run(self, cmd):
         self._mi_cmd_run("-interpreter-exec console \"%s\"" % cmd)
@@ -319,12 +319,16 @@ class Gdb:
         if res != 'done':
             raise DebuggerError('Failed to get backtrace!')
 
-    def add_bp(self, loc, ignore_count=0, cond=''):
+    def add_bp(self, loc, ignore_count=0, cond='', hw=False, tmp=False):
         # -break-insert [ -t ] [ -h ] [ -f ] [ -d ] [ -a ] [ -c condition ] [ -i ignore-count ]
         # [ -p thread-id ] [ location ]
         cmd_args = '-i %d %s' % (ignore_count, loc)
         if len(cond):
             cmd_args = '-c "%s" %s' % (cond, cmd_args)
+        if hw:
+            cmd_args = "-h " + cmd_args
+        if tmp:
+            cmd_args = "-t " + cmd_args
         res, res_body = self._mi_cmd_run('-break-insert %s' % cmd_args)
         if res != 'done' or not res_body or 'bkpt' not in res_body or 'number' not in res_body['bkpt']:
             raise DebuggerError('Failed to insert BP!')

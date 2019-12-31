@@ -5,6 +5,7 @@ from debug_backend import get_oocd, OocdEsp32
 
 REPORTS_DIR = os.path.abspath("./reports")
 
+
 class BasicTests(unittest.TestCase):
     def test_simple_start(self):
         get_oocd(chip_name="Esp32")  # if any of files to launch is not exists will through an exception

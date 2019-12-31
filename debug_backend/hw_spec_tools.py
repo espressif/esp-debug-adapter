@@ -1,8 +1,24 @@
 import sys
 import os
+
 from .gdb import Gdb
 from .oocd import Oocd
 from .hw_specific import *
+
+# useful if there is some variaty of naming
+hw_names = {
+    "esp32s2beta": "Esp32_S2",
+    "esp32s2_beta": "Esp32_S2",
+    "esp32_s2beta": "Esp32_S2",
+    "esp32_s2_beta": "Esp32_S2",
+    "esp32s2": "Esp32_S2",
+    "esp32-s2": "Esp32_S2",
+    "esp32-s2beta": "Esp32_S2",
+    "esp32-s2-beta": "Esp32_S2",
+    "esp32s2-beta": "Esp32_S2",
+    "esp_32": "Esp32",
+    "esp-32": "Esp32",
+}
 
 
 def get_hw_list():
@@ -16,6 +32,30 @@ def get_hw_list():
 
 def _str_to_class(classname):
     return getattr(sys.modules[__name__], classname)
+
+
+def get_good_name(some_name):
+    """
+
+    Parameters
+    ----------
+    some_nameL str - some name to check
+
+    Returns
+    -------
+    str  - good name, recognizable by the Backend
+    """
+    good_name = ""  # empty string by default
+    if not len(some_name):  # if chip_name not make sense
+        return good_name
+    better_name = hw_names.get(some_name.strip().lower(), some_name)  # if there is no conversion - keep it
+    hw_list = get_hw_list()
+    for hw in hw_list:
+        if better_name.lower() == hw.lower():  # lower for being case insensitive
+            good_name = hw
+            break
+        # if nothing was found - stays ""
+    return good_name
 
 
 def get_gdb(chip_name=None,
@@ -46,11 +86,7 @@ def get_gdb(chip_name=None,
     -------
     Gdb
     """
-    if chip_name in get_hw_list():
-        _gdb = _str_to_class("Gdb" + chip_name)
-    else:
-        _gdb = Gdb
-
+    _gdb = _str_to_class("Gdb" + get_good_name(chip_name))
     return _gdb(gdb_path=gdb_path,
                 log_level=log_level,
                 log_stream_handler=log_stream_handler,
@@ -88,10 +124,7 @@ def get_oocd(chip_name=None,
     -------
     Any
     """
-    if chip_name in get_hw_list():
-        _oocd = _str_to_class("Oocd" + chip_name)
-    else:
-        _oocd = Oocd
+    _oocd = _str_to_class("Oocd" + get_good_name(chip_name))
     return _oocd(chip_name=chip_name,
                  oocd_exec=oocd_exec,
                  oocd_scripts=oocd_scripts,
