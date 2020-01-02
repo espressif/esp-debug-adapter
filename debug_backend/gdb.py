@@ -3,6 +3,7 @@ from .globals import *
 import os
 import time
 import re
+import threading
 from pprint import pformat
 from pygdbmi.gdbcontroller import GdbController
 from .errors import *
@@ -51,6 +52,7 @@ class Gdb(object):
         }
         self._logger = log.logger_init("Gdb", log_level, log_stream_handler, log_file_handler)
         self._gdbmi = GdbController(gdb_path=gdb_path)
+        self._gdbmi_lock = threading.Lock()
         self._resp_cache = []
         self._target_state = TARGET_STATE_UNKNOWN
         self._target_stop_reason = TARGET_STOP_REASON_UNKNOWN
@@ -149,35 +151,36 @@ class Gdb(object):
                     return True
             return False
 
-        self._logger.debug('MI->: %s', cmd)
-        response = []
-        end = time.time()
-        if tmo:
-            end += tmo
-            done = False
-            try:
-                self._gdbmi.write(cmd, read_response=False)
-                while time.time() <= end and not done:  # while time is not up
-                    r = self._gdbmi.get_gdb_response(timeout_sec=0, raise_error_on_timeout=False)
-                    response += r
-                    done = _mi_cmd_isdone(cmd, response)
-            except Exception as e:
-                self._gdbmi.verify_valid_gdb_subprocess()
-        else:
-            while len(response) == 0:
-                response = self._gdbmi.write(cmd, raise_error_on_timeout=False)
-        self._logger.debug('MI<-:\n%s', pformat(response))
-        res, res_body = self._parse_mi_resp(response, new_tgt_state)  # None, None if empty
-        while not res:
-            # check for result report from GDB
-            response = self._gdbmi.get_gdb_response(0, raise_error_on_timeout=False)
-            if not len(response):
-                if tmo and (time.time() >= end):
-                    raise DebuggerTargetStateTimeoutError(
-                        'Failed to wait for completion of command "%s" / %s!' % (cmd, tmo))
+        with self._gdbmi_lock:
+            self._logger.debug('MI->: %s', cmd)
+            response = []
+            end = time.time()
+            if tmo:
+                end += tmo
+                done = False
+                try:
+                    self._gdbmi.write(cmd, read_response=False)
+                    while time.time() <= end and not done:  # while time is not up
+                        r = self._gdbmi.get_gdb_response(timeout_sec=0, raise_error_on_timeout=False)
+                        response += r
+                        done = _mi_cmd_isdone(cmd, response)
+                except Exception as e:
+                    self._gdbmi.verify_valid_gdb_subprocess()
             else:
-                self._logger.debug('MI<-:\n%s', pformat(response))
-                res, res_body = self._parse_mi_resp(response, new_tgt_state)  # None, None if empty
+                while len(response) == 0:
+                    response = self._gdbmi.write(cmd, raise_error_on_timeout=False)
+            self._logger.debug('MI<-:\n%s', pformat(response))
+            res, res_body = self._parse_mi_resp(response, new_tgt_state)  # None, None if empty
+            while not res:
+                # check for result report from GDB
+                response = self._gdbmi.get_gdb_response(0, raise_error_on_timeout=False)
+                if not len(response):
+                    if tmo and (time.time() >= end):
+                        raise DebuggerTargetStateTimeoutError(
+                            'Failed to wait for completion of command "%s" / %s!' % (cmd, tmo))
+                else:
+                    self._logger.debug('MI<-:\n%s', pformat(response))
+                    res, res_body = self._parse_mi_resp(response, new_tgt_state)  # None, None if empty
         return res, res_body
 
     def gdb_exit(self):
@@ -310,7 +313,7 @@ class Gdb(object):
         # -stack-list-frames [ --no-frame-filters low-frame high-frame ]
         res, res_body = self._mi_cmd_run('-stack-list-frames')
         if res != 'done' or not res_body or 'stack' not in res_body:
-            raise DebuggerError('Failed to get backtrace!')
+            raise DebuggerError('Failed to get backtrace! (%s / %s)' % (res, res_body))
         return res_body['stack']
 
     def select_frame(self, frame):
@@ -380,18 +383,19 @@ class Gdb(object):
         -------
         stop_reason : int
         """
-        if tmo is None:
-            tmo = 0
-        end = time.time() + tmo
-        while self._target_state != state:
-            if len(self._resp_cache):
-                recs = self._resp_cache
-            else:
-                # check for target state change report from GDB
-                recs = self._gdbmi.get_gdb_response(1, raise_error_on_timeout=False)
-                if tmo and len(recs) == 0 and time.time() >= end:
-                    raise DebuggerTargetStateTimeoutError("Failed to wait for target state %d!" % state)
-            self._parse_mi_resp(recs, state)
+        with self._gdbmi_lock:
+            end = time.time()
+            if tmo is not None:
+                end += tmo
+            while self._target_state != state:
+                if len(self._resp_cache):
+                    recs = []#self._resp_cache
+                else:
+                    # check for target state change report from GDB
+                    recs = self._gdbmi.get_gdb_response(0.5, raise_error_on_timeout=False)
+                    if tmo and len(recs) == 0 and time.time() >= end:
+                        raise DebuggerTargetStateTimeoutError("Failed to wait for target state %d!" % state)
+                self._parse_mi_resp(recs, state)
         return self._target_stop_reason
 
     def get_target_state(self):
@@ -428,7 +432,8 @@ class Gdb(object):
             cmd = '-thread-info %d' % thread_id
         else:
             cmd = '-thread-info'
-        res, res_body = self._mi_cmd_run(cmd)
+        # streaming of info for all threads over gdbmi can take some time, so use large timeout value
+        res, res_body = self._mi_cmd_run(cmd, tmo=20)
         # if res != 'done' or not res_body or 'threads' not in res_body or 'current-thread-id' not in res_body:
         if res != 'done' or not res_body or 'threads' not in res_body:  # TODO verify removing current-thread-id
             raise DebuggerError('Failed to get thread info!')

@@ -55,8 +55,8 @@ class GdbEsp(GdbXtensa):
         self.monitor_run('program_esp %s %s 0x%x' % (local_file_path, actions, int(off)), tmo)
 
     def connect(self, main_func=None):
-        if self.remote_target["use_remote"]:
-            self.target_select('remote', '%s:%s' % (self.remote_target["address"], self.remote_target["port"]))
+        Gdb.connect(self)
+        self.console_cmd_run("set remotetimeout 3")
         self.console_cmd_run("set remote hardware-watchpoint-limit 2")
         self.console_cmd_run("mon reset halt")
         self.console_cmd_run("flushregs")
@@ -94,12 +94,4 @@ class GdbEsp(GdbXtensa):
         if self._target_state != TARGET_STATE_STOPPED:
             self.exec_interrupt()
             self.wait_target_state(TARGET_STATE_STOPPED, 5)
-        if thread_id:
-            cmd = '-thread-info %d' % thread_id
-        else:
-            cmd = '-thread-info'
-        res, res_body = self._mi_cmd_run(cmd)
-        # if res != 'done' or not res_body or 'threads' not in res_body or 'current-thread-id' not in res_body:
-        if res != 'done' or not res_body or 'threads' not in res_body:  # TODO verify removing current-thread-id
-            raise DebuggerError('Failed to get thread info!')
-        return res_body.get('current-thread-id', None), res_body['threads']
+        return Gdb.get_thread_info(self, thread_id)
