@@ -13,9 +13,10 @@ class OocdXtensa(Oocd):
         self.config = defaults  # type: dict
         if top_defaults:
             self.config.update(top_defaults)
-        super().__init__(chip_name=chip_name, oocd_exec=oocd_exec, oocd_scripts=oocd_scripts, oocd_args=oocd_args,
-                         ip=ip, log_level=log_level, log_stream_handler=log_stream_handler,
-                         log_file_handler=log_file_handler, top_defaults=self.config, **kwargs)
+        super(OocdXtensa, self).__init__(chip_name=chip_name, oocd_exec=oocd_exec, oocd_scripts=oocd_scripts,
+                                         oocd_args=oocd_args,
+                                         ip=ip, log_level=log_level, log_stream_handler=log_stream_handler,
+                                         log_file_handler=log_file_handler, top_defaults=self.config, **kwargs)
 
     def perfmon_enable(self, counter, select, mask=None, kernelcnt=None, tracelevel=None):
         """Run OpenOCD perfmon_enable command, which starts performance counter
@@ -62,6 +63,7 @@ class OocdXtensa(Oocd):
 
 
 class GdbXtensa(Gdb):
+    "An Abstract class !!!"
     def __init__(self, gdb_path=None, log_level=None, log_stream_handler=None, log_file_handler=None,
                  log_gdb_proc_file=None, remote_target=None, remote_address=None, remote_port=None, top_defaults=None,
                  **kwargs):
@@ -71,7 +73,8 @@ class GdbXtensa(Gdb):
         self.config = defaults  # type: dict
         if top_defaults:
             self.config.update(top_defaults)
-        super().__init__(gdb_path=gdb_path, log_level=log_level, log_stream_handler=log_stream_handler,
-                         log_file_handler=log_file_handler, log_gdb_proc_file=log_gdb_proc_file,
-                         remote_target=remote_target, remote_address=remote_address, remote_port=remote_port,
-                         top_defaults=self.config, **kwargs)
+        super(GdbXtensa, self).__init__(gdb_path=gdb_path, log_level=log_level, log_stream_handler=log_stream_handler,
+                                        log_file_handler=log_file_handler, log_gdb_proc_file=log_gdb_proc_file,
+                                        remote_target=remote_target, remote_address=remote_address,
+                                        remote_port=remote_port,
+                                        top_defaults=self.config, **kwargs)

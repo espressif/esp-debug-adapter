@@ -15,3 +15,4 @@
 *.sublime-workspace
 /debug_backend/*.bak
 */reports
+*bak
