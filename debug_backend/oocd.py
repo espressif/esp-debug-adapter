@@ -3,87 +3,79 @@ import subprocess
 import telnetlib
 import threading
 import time
-from .globals import *
+from .defs import *
 from . import log
 
 
 class Oocd(threading.Thread):
-    # TODO add reading OPENOCD_SCRIPTS and others
-    _oocd_proc = None
-    _logger = None
+    """
+        Class to communicate to OpenOCD
+    """
     CREATION_FLAGS = 0
     STDOUT_DEST = subprocess.PIPE
-    OOCD_TELNET_PORT = 4444
+    GDB_PORT = 3333
+    TELNET_PORT = 4444
+    TCL_PORT = 6666
+    chip_name = ''
 
-    def get_config(self, param_name, in_val=None):
-        if in_val is not None:
-            return in_val
-        return self.config.get(param_name)
-
-    def __init__(self, chip_name=None,
+    def __init__(self,
                  oocd_exec=None,
                  oocd_scripts=None,
-                 oocd_args=None,
-                 ip=None,
+                 oocd_cfg_files=[],
+                 oocd_cfg_cmds=[],
+                 oocd_debug=2,
+                 oocd_args=[],
+                 host='localhost',
                  log_level=None,
                  log_stream_handler=None,
-                 log_file_handler=None,
-                 top_defaults=None,
-                 **kwargs):
+                 log_file_handler=None):
         """
+            Constructor.
 
-        Parameters
-        ----------
-        chip_name
-        oocd_exec
-            use "" value for pass openocd's subprocess creation
-        oocd_scripts
-        oocd_args
-        ip
-        log_level
-        log_stream_handler
-        log_file_handler
-        top_defaults
-        kwargs
+            Parameters
+            ----------
+            oocd_exec : string
+                path to OpenOCD executable. If None OpenOCD will not be started,
+                but externally ran instance can be connected to via Telnet/TCL using 'host' argument.
+            oocd_scripts : string
+                path to OpenOCD scripts dir.
+            oocd_cfg_files : list
+                list of paths to config files. Relative to 'oocd_scripts'.
+            oocd_cfg_cmds : list
+                list of config commands to execute during initialization.
+            oocd_debug : int
+                OpenOCD debug level: 1..3.
+            oocd_args : list
+                list of arbitrary OpenOCD command line arguments.
+            host : string
+                host to connect to running OpenOCD Telnet/TCL console.
+            log_level : int
+                logging level for this object. See logging.CRITICAL etc
+            log_stream_handler : logging.Handler
+                Logging stream handler for this object.
+            log_file_handler : logging.Handler
+                Logging file handler for this object.
         """
-        defaults = {
-            "chip_name": CHIP_NAME_NA,
-            "oocd_exec": os.environ.get("OPENOCD_BIN", "openocd"),
-            "ip": 'localhost',
-        }
-        super(Oocd, self).__init__()
-        # defaults
-        self.config = defaults  # type: dict
-        if top_defaults:
-            self.config.update(top_defaults)
-
-        chip_name = self.get_config("chip_name", chip_name)
-        oocd_exec = self.get_config("oocd_exec", oocd_exec)
-
-        oocd_scripts = self.get_config("oocd_scripts", oocd_scripts)
-        oocd_args = self.get_config("oocd_args", oocd_args)
-
-        ip = self.get_config("ip", ip)
-        log_level = self.get_config("log_level", log_level)
-        log_stream_handler = self.get_config("log_stream_handler", log_stream_handler)
-        log_file_handler = self.get_config("log_file_handler", log_file_handler)
-
+        if oocd_exec is None:
+            oocd_exec = os.environ.get("OPENOCD_BIN", "openocd"),
         oocd_full_args = []
         if oocd_scripts is None:
             oocd_scripts = os.environ.get("OPENOCD_SCRIPTS", None)
-            if oocd_scripts is not None:
-                oocd_full_args += ['-s', oocd_scripts]
-
+        if oocd_scripts is not None:
+            oocd_full_args += ['-s', oocd_scripts]
+        for c in oocd_cfg_cmds:
+            oocd_full_args += ['-c', "'%s'" % c]
+        for f in oocd_cfg_files:
+            oocd_full_args += ['-f', '%s' % f]
+        oocd_full_args += ['-d%d' % oocd_debug]
         oocd_full_args += oocd_args
 
-        self.chip_name = chip_name
+        super(Oocd, self).__init__()
         self.do_work = True
-        ip_binary = ip.encode('utf-8')
+        self._logger = log.logger_init('OpenOCD', log_level, log_stream_handler, log_file_handler)
         if oocd_exec is not None:
-            self._logger = log.logger_init('OpenOCD', log_level, log_stream_handler, log_file_handler)
-        self._logger.debug('Start OpenOCD: {%s}', oocd_args)
-
-        if oocd_exec != "":  # if oocd_exec is not empty - run
+            # start OpenOCD
+            self._logger.debug('Start OpenOCD: {%s}', oocd_full_args)
             try:
                 self._oocd_proc = subprocess.Popen(
                     bufsize=0, args=[oocd_exec] + oocd_full_args,
@@ -97,23 +89,23 @@ class Oocd(threading.Thread):
             if self._oocd_proc.poll() is not None:
                 self._logger.error("Failed to start telnet connection with OpenOCD cause it's closed!")
                 self._logger.error(self._oocd_proc.stdout.read())
-                raise ProcessLookupError("OpenOCD is closed!")
-        else:
-            self._logger.debug('Open telnet conn...')
-            try:
-                self._tn = telnetlib.Telnet(ip_binary, self.OOCD_TELNET_PORT, 5)
-                self._tn.read_until(b'>', 5)
-            except Exception as e:
-                self._logger.error('Failed to open telnet connection with OpenOCD!')
-                if oocd_exec is not None:
-                    if self._oocd_proc.stdout:
-                        out = self._oocd_proc.stdout.read()
-                        self._logger.debug(
-                            '================== OOCD OUTPUT START =================\n'
-                            '%s================== OOCD OUTPUT END =================\n',
-                            out)
-                    self._oocd_proc.terminate()
-                raise e
+                raise RuntimeError("OpenOCD is closed!")
+        # Open telnet connection to it
+        self._logger.debug('Open telnet conn to "%s"...', host)
+        try:
+            self._tn = telnetlib.Telnet(host, self.TELNET_PORT, 5)
+            self._tn.read_until(b'>', 5)
+        except Exception as e:
+            self._logger.error('Failed to open telnet connection with OpenOCD (%s)!', e)
+            if e is EOFError and oocd_exec is not None:
+                if self._oocd_proc.stdout:
+                    out = self._oocd_proc.stdout.read()
+                    self._logger.debug(
+                        '================== OOCD OUTPUT START =================\n'
+                        '%s================== OOCD OUTPUT END =================\n',
+                        out)
+                self._oocd_proc.terminate()
+            raise e
 
     def run(self):
         while self._oocd_proc.stdout and self.do_work:
@@ -141,23 +133,18 @@ class Oocd(threading.Thread):
         self._logger.debug('TELNET <-: %s' % resp)
         self._logger.debug('TELNET ->: %s' % cmd)
         cmd_sent = cmd + '\n'
+        cmd_sent = cmd_sent.encode('utf-8')
         self._tn.write(cmd_sent)
-        resp = self._tn.read_until('>')
+        resp = self._tn.read_until(b'>')
         # remove all '\r' first
-        resp = resp.replace('\r', '')
+        resp = resp.replace(b'\r', b'')
         # command we sent will be echoed back - remove it
         index_start = resp.find(cmd_sent)
         if index_start >= 0:
             resp = resp[index_start + len(cmd_sent):]
         # the response will also include '>', next prompt - remove it as well
-        index_end = resp.rfind('>')
+        index_end = resp.rfind(b'>')
         if index_end >= 0:
             resp = resp[:index_end]
         self._logger.debug('TELNET <-: %s' % resp)
-        return resp
-
-    def perfmon_dump(self, **kwargs):
-        return None
-
-    def perfmon_enable(self, **kwargs):
-        return None
+        return resp.decode('utf-8')

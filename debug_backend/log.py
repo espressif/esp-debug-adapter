@@ -18,7 +18,7 @@ def logger_init(log_name="Log", log_level=None, stream_handler=None, file_handle
     if log_level:
         logger.setLevel(log_level)
     else:
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(logging.CRITICAL)
     if stream_handler:
         logger.addHandler(stream_handler)
     if file_handler:

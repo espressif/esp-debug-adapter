@@ -1,55 +1,50 @@
 from . import log
-from .globals import *
+from .defs import *
 import os
 import time
 import re
 import threading
 from pprint import pformat
 from pygdbmi.gdbcontroller import GdbController
-from .errors import *
 
 
 class Gdb(object):
-    def get_config(self, param_name, in_val=None):
-        if in_val is not None:
-            return in_val
-        return self.config.get(param_name)
+    """
+        Class to communicate to GDB
+    """
+    chip_name = ''
 
-    def __init__(self, gdb_path=None,
+    def __init__(self, gdb_path='gdb',
+                 remote_target=None,
+                 extended_remote_mode=False,
+                 gdb_log_file=None,
                  log_level=None,
                  log_stream_handler=None,
-                 log_file_handler=None,
-                 log_gdb_proc_file=None,
-                 remote_target=None,
-                 remote_address=None,
-                 remote_port=None,
-                 top_defaults=None,
-                 **kwargs):
-        defaults = {
-            "gdb_path": "gdb",
-            "remote_target": True,
-            "remote_address": "localhost",
-            "remote_port": 3333,
-        }
-        self.config = defaults  # type: dict
-        if top_defaults:
-            self.config.update(top_defaults)
+                 log_file_handler=None):
+        """
+            Constructor.
 
-        gdb_path = self.get_config("gdb_path", gdb_path)
-        log_level = self.get_config("log_level", log_level)
-        log_stream_handler = self.get_config("log_stream_handler", log_stream_handler)
-        log_file_handler = self.get_config("log_file_handler", log_file_handler)
-        log_gdb_proc_file = self.get_config("log_gdb_proc_file", log_gdb_proc_file)
-        remote_target = self.get_config("remote_target", remote_target)
-        remote_address = self.get_config("remote_address", remote_address)
-        remote_port = self.get_config("remote_port", remote_port)
-
-        # Start gdb process
-        self.remote_target = {
-            "use_remote": remote_target,
-            "address": remote_address,
-            "port": remote_port
-        }
+            Parameters
+            ----------
+            gdb_path : string
+                path to GDB executable.
+            remote_target : string
+                remote target address, for possible values see https://www.sourceware.org/gdb/onlinedocs/gdb/Connecting.html.
+                Should be None for local targets.
+            extended_remote_mode : bool
+                If True extended remote mode should be used.
+            gdb_log_file : string
+                path to GDB log file.
+            log_level : int
+                logging level for this object. See logging.CRITICAL etc
+            log_stream_handler : logging.Handler
+                Logging stream handler for this object.
+            log_file_handler : logging.Handler
+                Logging file handler for this object.
+        """
+        self.main_func = 'main'
+        self._remote_target = remote_target
+        self._extended_remote_mode = extended_remote_mode
         self._logger = log.logger_init("Gdb", log_level, log_stream_handler, log_file_handler)
         self._gdbmi = GdbController(gdb_path=gdb_path)
         self._gdbmi_lock = threading.Lock()
@@ -60,11 +55,11 @@ class Gdb(object):
         self._curr_wp_val = None
         # gdb config
         self.gdb_set("mi-async", "on")
-        if log_gdb_proc_file is not None:
-            pardirs = os.path.dirname(log_gdb_proc_file)
+        if gdb_log_file is not None:
+            pardirs = os.path.dirname(gdb_log_file)
             if pardirs:
                 os.makedirs(pardirs, exist_ok=True)  # create non-existing folders
-            self.gdb_set("logging", "file %s" % log_gdb_proc_file)
+            self.gdb_set("logging", "file %s" % gdb_log_file)
             self.gdb_set("logging", "on")
 
     def _on_notify(self, rec):
@@ -287,7 +282,9 @@ class Gdb(object):
         return int(sval, 0)
 
     def gdb_set(self, var, val):
-        self._mi_cmd_run("-gdb-set %s %s" % (var, val))
+        res,_ = self._mi_cmd_run("-gdb-set %s %s" % (var, val))
+        if res != "done":
+            raise DebuggerError('Failed to set variable!')
 
     def get_variables(self, thread_num=None, frame_num=0):
         # -stack-list-variables [ --no-frame-filters ] [ --skip-unavailable ] print-values
@@ -408,11 +405,24 @@ class Gdb(object):
         return self._curr_wp_val
 
     def connect(self):
-        if self.remote_target["use_remote"]:
-            self.target_select('remote', '%s:%s' % (self.remote_target["address"], self.remote_target["port"]))
+        self._logger.debug('Connect to %s', self._remote_target)
+        if self._remote_target is None:
+            return
+        remote_mode = 'extended_remote' if self._extended_remote_mode else 'remote'
+        self.target_select(remote_mode, self._remote_target)
 
     def disconnect(self):
         self.target_disconnect()
+
+    def resume(self):
+        self.exec_continue()
+        self.wait_target_state(TARGET_STATE_RUNNING, 5)
+
+    def halt(self):
+        if self._target_state == TARGET_STATE_STOPPED:
+            return
+        self.exec_interrupt()
+        self.wait_target_state(TARGET_STATE_STOPPED, 5)
 
     def get_thread_info(self, thread_id=None):
         """
@@ -464,8 +474,5 @@ class Gdb(object):
                 return th
         return None
 
-    def set_app_offset(self, **kwargs):
-        return None
-
-    def target_program(self, **kwargs):
+    def target_program(self):
         return None
