@@ -1,0 +1,36 @@
+stages:
+  - requests_testing
+
+cache:
+  paths:
+  - node_modules
+
+variables:
+    GIT_SUBMODULE_STRATEGY: normal
+    CI_DEBUG_TRACE: "true"
+
+before_script:
+    - export PYTHONPATH="$CI_PROJECT_DIR:$CI_PROJECT_DIR/tests"
+    - echo $PYTHONPATH
+    - export PATH="$CI_PROJECT_DIR:$PATH"
+    - echo $PATH
+
+test_usingx86_target:
+  image: $CI_DOCKER_REGISTRY/ubuntu-vscode:1-d2303206
+  stage: requests_testing
+  tags:
+    - gdb_amd64_test
+  artifacts:
+    paths:
+    - /*debug.log
+    - tests/results/*
+    reports:
+      junit:
+        - tests/results/*
+    when: always
+    expire_in: 1 week
+  script:
+
+    - python3 -m pip install -r requirements.txt
+    - cd $CI_PROJECT_DIR/tests
+    # - python3 ./run_tests.py
