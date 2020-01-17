@@ -262,7 +262,8 @@ class DebugAdapter:
         """
         if self.state.openocd_need_run:
             self.start_oocd()
-        self.start_gdb()
+        if (not self.is_connection_check_mode()):
+            self.start_gdb()
         self.state.initialized = True
 
     def poll_target(self, *kwargs):
