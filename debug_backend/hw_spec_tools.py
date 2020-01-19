@@ -39,14 +39,14 @@ def get_good_name(some_name):
 
     Parameters
     ----------
-    some_nameL str - some name to check
+    some_name str - some name to check
 
     Returns
     -------
     str  - good name, recognizable by the Backend
     """
     good_name = ""  # empty string by default
-    if not len(some_name):  # if chip_name not make sense
+    if  (some_name is None) or (not len(some_name)):  # if chip_name not make sense
         return good_name
     better_name = hw_names.get(some_name.strip().lower(), some_name)  # if there is no conversion - keep it
     hw_list = get_hw_list()
