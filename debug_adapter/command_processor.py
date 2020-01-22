@@ -75,7 +75,7 @@ class CommandProcessor(object):
         ----------
         request : schema.InitializeRequest
 
-s        """
+        """
         m = Measurement()
         self.da.adapter_init()
         # response
