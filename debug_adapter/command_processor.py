@@ -1,4 +1,11 @@
-# https://microsoft.github.io/debug-adapter-protocol/overview
+# Copyright (c) 2019 Fabio Zadrozny
+# Additions Copyright (c) 2020, Espressif Systems (Shanghai) Co. Ltd.
+#
+# This program and the accompanying materials are made
+# available under the terms of the Eclipse Public License 2.0
+# which is available at https://www.eclipse.org/legal/epl-2.0/
+#
+# SPDX-License-Identifier: EPL-2.0
 
 import json
 import sys

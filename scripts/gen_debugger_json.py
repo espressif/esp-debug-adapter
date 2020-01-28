@@ -1,3 +1,11 @@
+# Copyright (c) 2019 Fabio Zadrozny
+#
+# This program and the accompanying materials are made
+# available under the terms of the Eclipse Public License 2.0
+# which is available at https://www.eclipse.org/legal/epl-2.0/
+#
+# SPDX-License-Identifier: EPL-2.0
+
 '''
 Notes:
 
@@ -43,7 +51,7 @@ def generate_debugger():
                         'type': 'string',
                         'description': 'The .py file that should be debugged (i.e.: python `program.py`).',
                     },
-                    
+
                     'module': {
                         'type': 'string',
                         'description': 'The module to be debugged (i.e.: python -m `module`).',

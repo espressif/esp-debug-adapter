@@ -68,3 +68,14 @@ Options:
 *   This software used at the Espressif's vscode-plugin, but could be run standalone
 
 *   The project contains debug adapter written in python following  a protocol my Microsoft https://microsoft.github.io/debug-adapter-protocol/
+
+
+## Credits and licensing
+
+This software is based on a [tutorial](https://github.com/fabioz/python_debug_adapter_tutorial) by Fabio Zadrozny.
+
+All original code in this repository is Copyright 2020 Espressif Systems (Shanghai) Co. Ltd.
+
+The project is released under Eclipse Public License 2.0.
+
+In case an individual source file is also available under a different license, this is indicated in the file itself.
