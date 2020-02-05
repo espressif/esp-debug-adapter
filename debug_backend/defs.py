@@ -1,5 +1,3 @@
-CHIP_NAME_NA = "not specified"
-
 # ******* GDB **************************************
 # Target states
 TARGET_STATE_UNKNOWN = 0
@@ -14,3 +12,11 @@ TARGET_STOP_REASON_WP = 4
 TARGET_STOP_REASON_WP_SCOPE = 5
 TARGET_STOP_REASON_STEPPED = 6
 TARGET_STOP_REASON_FN_FINISHED = 7
+
+
+class DebuggerError(RuntimeError):
+    pass
+
+
+class DebuggerTargetStateTimeoutError(DebuggerError):
+    pass
