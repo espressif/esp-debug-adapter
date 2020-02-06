@@ -1,55 +1,63 @@
+# Copyright (c) 2019 Fabio Zadrozny
+#
+# This program and the accompanying materials are made
+# available under the terms of the Eclipse Public License 2.0
+# which is available at https://www.eclipse.org/legal/epl-2.0/
+#
+# SPDX-License-Identifier: EPL-2.0
+
 class _OrderedSet(object):
     # Not a good ordered set (just something to be small without adding any deps)
-    
+
     def __init__(self, initial_contents=None):
         self._contents = []
         self._contents_as_set = set()
         if initial_contents is not None:
             for x in initial_contents:
                 self.add(x)
-    
+
     def add(self, x):
         if x not in self._contents_as_set:
             self._contents_as_set.add(x)
             self._contents.append(x)
-            
+
     def copy(self):
         return _OrderedSet(self._contents)
-    
+
     def update(self, contents):
         for x in contents:
             self.add(x)
-            
+
     def __iter__(self):
         return iter(self._contents)
-    
+
     def __contains__(self, item):
         return item in self._contents_as_set
-    
+
     def __len__(self):
         return len(self._contents)
-    
+
     def set_repr(self):
         if len(self) == 0:
             return 'set()'
-            
+
         lst = [repr(x) for x in self]
         return '{' + ', '.join(lst) + '}'
-    
+
 
 class Ref(object):
-    
+
     def __init__(self, ref):
         self.ref = ref
-        
+
     def __str__(self):
         return self.ref
 
-    
+
 def load_schema_data():
     import os.path
     import json
-    
+
     json_file = os.path.join(os.path.dirname(__file__), 'debugProtocol.json')
     if not os.path.exists(json_file):
         import requests
@@ -110,7 +118,7 @@ def collect_bases(curr_class, classes_to_generate, memo=None):
             ret.append(base_definition)
             ret.extend(collect_bases(classes_to_generate[base_definition], classes_to_generate, memo))
 
-    return ret        
+    return ret
 
 
 def fill_properties_and_required_from_base(classes_to_generate):
@@ -118,19 +126,19 @@ def fill_properties_and_required_from_base(classes_to_generate):
     for class_to_generate in classes_to_generate.values():
         dct = {}
         s = _OrderedSet()
-        
+
         for base_definition in reversed(collect_bases(class_to_generate, classes_to_generate)):
             # Note: go from base to current so that the initial order of the properties has that
             # same order.
             dct.update(classes_to_generate[base_definition].get('properties', {}))
             s.update(classes_to_generate[base_definition].get('required', _OrderedSet()))
-    
+
         dct.update(class_to_generate['properties'])
         class_to_generate['properties'] = dct
-        
+
         s.update(class_to_generate['required'])
         class_to_generate['required'] = s
-        
+
     return class_to_generate
 
 
@@ -142,10 +150,10 @@ def update_class_to_generate_description(class_to_generate):
         wrapped = textwrap.wrap(line.strip(), 100)
         lines.extend(wrapped)
         lines.append('')
-    
+
     while lines and lines[-1] == '':
         lines = lines[:-1]
-    
+
     class_to_generate['description'] = '    ' + ('\n    '.join(lines))
 
 
@@ -159,13 +167,13 @@ def update_class_to_generate_type(class_to_generate):
                 assert prop_type.startswith('#/definitions/')
                 prop_type = prop_type[len('#/definitions/'):]
                 prop_val['type'] = Ref(prop_type)
-    
+
 
 def update_class_to_generate_register_dec(classes_to_generate, class_to_generate):
     # Default
     class_to_generate['register_request'] = ''
     class_to_generate['register_dec'] = '@register'
-    
+
     properties = class_to_generate.get('properties')
     enum_type = properties.get('type', {}).get('enum')
     command = None
@@ -182,20 +190,20 @@ def update_class_to_generate_register_dec(classes_to_generate, class_to_generate
                     command = {'enum' : ['error']}
                 else:
                     raise AssertionError('Unhandled: %s' % (response_name,))
-            
+
         else:
             command = properties.get('command')
-            
+
         if command:
             enum = command.get('enum')
             if enum and len(enum) == 1:
                 class_to_generate['register_request'] = '@register_%s(%r)\n' % (msg_type, enum[0])
-        
-    
+
+
 def extract_prop_name_and_prop(class_to_generate):
     properties = class_to_generate.get('properties')
     required = _OrderedSet(class_to_generate.get('required', _OrderedSet()))
-    
+
     # Sort so that required come first
     prop_name_and_prop = list(properties.items())
 
@@ -206,12 +214,12 @@ def extract_prop_name_and_prop(class_to_generate):
                 return 0.5  # seq when required is after the other required keys (to have a default of -1).
             return 0
         return 1
-    
+
     prop_name_and_prop.sort(key=compute_sort_key)
-    
+
     return prop_name_and_prop
 
-    
+
 def update_class_to_generate_to_json(class_to_generate):
     required = _OrderedSet(class_to_generate.get('required', _OrderedSet()))
     prop_name_and_prop = extract_prop_name_and_prop(class_to_generate)
@@ -219,7 +227,7 @@ def update_class_to_generate_to_json(class_to_generate):
     to_dict_body = ['def to_dict(self):']
     to_dict_body.append('    dct = {')
     first_not_required = False
-    
+
     for prop_name, prop in prop_name_and_prop:
         namespace = dict(prop_name=prop_name)
         is_ref = prop['type'].__class__ == Ref
@@ -232,23 +240,23 @@ def update_class_to_generate_to_json(class_to_generate):
             if not first_not_required:
                 first_not_required = True
                 to_dict_body.append('    }')
-            
+
             to_dict_body.append('    if self.%(prop_name)s is not None:' % namespace)
             if is_ref:
                 to_dict_body.append('        dct[%(prop_name)r] = self.%(prop_name)s.to_dict()' % namespace)
             else:
                 to_dict_body.append('        dct[%(prop_name)r] = self.%(prop_name)s' % namespace)
-                
+
     if not first_not_required:
         first_not_required = True
         to_dict_body.append('    }')
-        
+
     to_dict_body.append('    dct.update(self.kwargs)')
     to_dict_body.append('    return dct')
-        
+
     class_to_generate['to_dict'] = _indent_lines('\n'.join(to_dict_body))
 
-    
+
 def update_class_to_generate_init(class_to_generate):
     args = []
     init_body = []
@@ -269,7 +277,7 @@ def update_class_to_generate_init(class_to_generate):
                     args.append(prop_name)
             else:
                 args.append(prop_name + '=None')
-                
+
             if prop['type'].__class__ == Ref:
                 namespace = dict(
                     prop_name=prop_name,
@@ -280,11 +288,11 @@ def update_class_to_generate_init(class_to_generate):
                 init_body.append('    else:')
                 init_body.append('        self.%(prop_name)s = %(ref_name)s(**%(prop_name)s) if %(prop_name)s.__class__ !=  %(ref_name)s else %(prop_name)s' % namespace
                 )
-                
+
             else:
                 init_body.append('    self.%(prop_name)s = %(prop_name)s' % dict(
                     prop_name=prop_name))
-            
+
         prop_type = prop['type']
         prop_description = prop.get('description', '')
 
@@ -320,7 +328,7 @@ def update_class_to_generate_props(class_to_generate):
         if isinstance(o, Ref):
             return o.ref
         raise AssertionError('Unhandled: %s' % (o,))
-    
+
     properties = class_to_generate['properties']
     class_to_generate['props'] = '    __props__ = %s' % _indent_lines(
         json.dumps(properties, indent=4, default=default)).strip()
@@ -330,7 +338,7 @@ def update_class_to_generate_refs(class_to_generate):
     properties = class_to_generate['properties']
     class_to_generate['refs'] = '    __refs__ = %s' % _OrderedSet(key for (key, val) in properties.items() if val['type'].__class__ == Ref).set_repr()
 
-    
+
 def update_class_to_generate_objects(classes_to_generate, class_to_generate):
     properties = class_to_generate['properties']
     for key, val in properties.items():
@@ -342,16 +350,16 @@ def update_class_to_generate_objects(classes_to_generate, class_to_generate):
             })
             if 'properties' not in create_new:
                 create_new['properties'] = {}
-            
+
             assert create_new['name'] not in classes_to_generate
             classes_to_generate[create_new['name']] = create_new
-            
+
             update_class_to_generate_type(create_new)
             update_class_to_generate_props(create_new)
-            
+
             # Update nested object types
             update_class_to_generate_objects(classes_to_generate, create_new)
-            
+
             val['type'] = Ref(create_new['name'])
             val.pop('properties', None)
 
@@ -359,7 +367,7 @@ def update_class_to_generate_objects(classes_to_generate, class_to_generate):
 def gen_debugger_protocol():
     import os.path
     import sys
-    
+
     if sys.version_info[:2] < (3, 6):
         raise AssertionError('Must be run with Python 3.6 onwards (to keep dict order).')
 
@@ -372,7 +380,7 @@ def gen_debugger_protocol():
         update_class_to_generate_type(class_to_generate)
         update_class_to_generate_props(class_to_generate)
         update_class_to_generate_objects(classes_to_generate, class_to_generate)
-        
+
     for class_to_generate in classes_to_generate.values():
         update_class_to_generate_refs(class_to_generate)
         update_class_to_generate_init(class_to_generate)
