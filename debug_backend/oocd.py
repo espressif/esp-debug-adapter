@@ -25,7 +25,7 @@ class Oocd(threading.Thread):
                  oocd_cfg_cmds=[],
                  oocd_debug=2,
                  oocd_args=[],
-                 host='localhost',
+                 host='127.0.0.1',
                  log_level=None,
                  log_stream_handler=None,
                  log_file_handler=None):

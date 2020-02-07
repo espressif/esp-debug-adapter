@@ -273,13 +273,17 @@ class Gdb(object):
         else:
             raise DebuggerError('Failed to eval expression!')
 
+    def extract_exec_addr(self, addr_val):
+        sval_re = re.search('(.*)[<](.*)[>]', addr_val)
+        if sval_re:
+            return int(sval_re.group(1), 0)
+        return int(addr_val, 0)
+
+
     def get_reg(self, nm):
         sval = self.data_eval_expr('$%s' % nm)
         # for PC we'll get something like '0x400e0db8 <gpio_set_direction>'
-        sval_re = re.search('(.*)[<](.*)[>]', sval)
-        if sval_re:
-            sval = sval_re.group(1)
-        return int(sval, 0)
+        return self.extract_exec_addr(sval)
 
     def gdb_set(self, var, val):
         res,_ = self._mi_cmd_run("-gdb-set %s %s" % (var, val))
