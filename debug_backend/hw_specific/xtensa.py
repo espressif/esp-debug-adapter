@@ -11,7 +11,7 @@ class OocdXtensa(Oocd):
     def __init__(self, oocd_exec=None, oocd_scripts=None, oocd_cfg_files=[], oocd_cfg_cmds=[],
                  oocd_debug=2, oocd_args=[], host='localhost', log_level=None, log_stream_handler=None, log_file_handler=None):
         super(OocdXtensa, self).__init__(oocd_exec=oocd_exec, oocd_scripts=oocd_scripts,
-                                         oocd_cfg_files=oocd_cfg_files, oocd_cfg_cmds=oocd_cfg_cmds,
+                                         oocd_cfg_files=oocd_cfg_files, oocd_cfg_cmds=oocd_cfg_cmds, oocd_debug=oocd_debug,
                                          oocd_args=oocd_args, host=host, log_level=log_level, log_stream_handler=log_stream_handler,
                                          log_file_handler=log_file_handler)
 
