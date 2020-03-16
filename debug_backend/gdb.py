@@ -51,6 +51,7 @@ class Gdb(object):
         self._resp_cache = []
         self._target_state = TARGET_STATE_UNKNOWN
         self._target_stop_reason = TARGET_STOP_REASON_UNKNOWN
+        self.stream_handlers = {'console': None, 'target': None, 'log': None}
         self._curr_frame = None
         self._curr_wp_val = None
         # gdb config
@@ -105,8 +106,16 @@ class Gdb(object):
             processed_recs += 1
             if rec['type'] == 'log':
                 self._logger.debug('LOG: %s', pformat(rec['payload']))
+                if self.stream_handlers['log']:
+                    self.stream_handlers['log'](rec['payload'])
             elif rec['type'] == 'console':
                 self._logger.info('CONS: %s', pformat(rec['payload']))
+                if self.stream_handlers['console']:
+                    self.stream_handlers['console'](rec['payload'])
+            elif rec['type'] == 'target':
+                self._logger.debug('TGT: %s', pformat(rec['payload']))
+                if self.stream_handlers['target']:
+                    self.stream_handlers['target'](rec['payload'])
             elif rec['type'] == 'notify':
                 self._logger.info('NOTIFY: %s %s', rec['message'], pformat(rec['payload']))
                 self._on_notify(rec)
@@ -129,9 +138,6 @@ class Gdb(object):
     def _mi_cmd_run(self, cmd, new_tgt_state=None, tmo=5):
         def _mi_cmd_isdone(cmd, response):
             if len(response):
-                # if cmd == '-exec-next':
-                #     if response[-1].get('message') == 'stopped' and response[-2].get('message') == 'running':
-                #         return True
                 # TODO: less hardcode
                 if cmd in ['-exec-step', '-exec-next', '-exec-continue', '-exec-continue --all', '-exec-finish']:
                     if response[-1].get('message') == 'stopped':
@@ -177,6 +183,11 @@ class Gdb(object):
                     self._logger.debug('MI<-:\n%s', pformat(response))
                     res, res_body = self._parse_mi_resp(response, new_tgt_state)  # None, None if empty
         return res, res_body
+
+    def stream_handler_set(self, stream_type, handler):
+        if stream_type not in self.stream_handlers:
+            raise DebuggerError('Unsupported stream type "%s"' % stream_type)
+        self.stream_handlers[stream_type] = handler
 
     def gdb_exit(self):
         """ -gdb-exit ~= quit """
@@ -278,7 +289,6 @@ class Gdb(object):
         if sval_re:
             return int(sval_re.group(1), 0)
         return int(addr_val, 0)
-
 
     def get_reg(self, nm):
         sval = self.data_eval_expr('$%s' % nm)
