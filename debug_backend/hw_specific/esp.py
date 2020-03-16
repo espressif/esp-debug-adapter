@@ -102,6 +102,9 @@ class GdbEspXtensa(GdbXtensa):
     def sysview_stop(self):
         self.monitor_run('esp sysview stop')
 
+    def sysview_mcore_start(self, file):
+        self.monitor_run('esp sysview_mcore start %s' % (file))
+
 
 class OocdEsp32(OocdEspXtensa):
     """
