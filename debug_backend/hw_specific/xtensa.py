@@ -38,30 +38,23 @@ class OocdXtensa(Oocd):
         """Run OpenOCD perfmon_dump command
 
         Reported results are returned as a dictionary. Each key is the counter id.
-        Each value is a tuple of counts for PRO and APP CPUs.
+        Each value is a tuple of counts.
         If APP CPU is disabled, its count will be None.
         """
         cmd = 'xtensa perfmon_dump'
         if counter is not None:
-            cmd += '%d' % counter
+            cmd += ' %d' % counter
         resp = self.cmd_exec(cmd)
         # Response should have one line for every counter
-        core = None
         result = {}
         lines = resp.split('\n')
         for line in lines:
             if len(line) == 0:
                 continue
-            tokens = re.match(r'CPU(?P<core>\d+):$', line)
-            if tokens:
-                core = int(tokens.group('core'))
-                if core not in result:
-                    result[core] = {}
-            else:
-                tokens = re.match(r'Counter (?P<counter>\d+): (?P<val>\d+)', line)
-                val = int(tokens.group('val'))
-                counter = int(tokens.group('counter'))
-                result[core][counter] = val
+            tokens = re.match(r'Counter (?P<counter>\d+): (?P<val>\d+)', line)
+            val = int(tokens.group('val'))
+            counter = int(tokens.group('counter'))
+            result[counter] = val
         return result
 
 

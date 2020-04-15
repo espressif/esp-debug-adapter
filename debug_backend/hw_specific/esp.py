@@ -9,12 +9,13 @@ class OocdEspXtensa(OocdXtensa):
         Class to communicate to OpenOCD supporting ESP Xtensa-specific features
     """
 
-    def __init__(self, oocd_exec=None, oocd_scripts=None, oocd_cfg_files=[], oocd_cfg_cmds=[],
+    def __init__(self, cores_num=1, oocd_exec=None, oocd_scripts=None, oocd_cfg_files=[], oocd_cfg_cmds=[],
                  oocd_debug=2, oocd_args=[], host='127.0.0.1', log_level=None, log_stream_handler=None, log_file_handler=None):
         super(OocdEspXtensa, self).__init__(oocd_exec=oocd_exec, oocd_scripts=oocd_scripts,
                                          oocd_cfg_files=oocd_cfg_files, oocd_cfg_cmds=oocd_cfg_cmds, oocd_debug=oocd_debug,
                                          oocd_args=oocd_args, host=host, log_level=log_level, log_stream_handler=log_stream_handler,
                                          log_file_handler=log_file_handler)
+        self.cores_num = cores_num
 
     def set_appimage_offset(self, app_flash_off):
         self.cmd_exec('esp appimage_offset 0x%x' % (app_flash_off))
@@ -34,6 +35,39 @@ class OocdEspXtensa(OocdXtensa):
 
     def sysview_stop(self):
         self.cmd_exec('esp sysview stop')
+
+    def perfmon_dump(self, counter = None):
+        """Run OpenOCD perfmon_dump command
+
+        Reported results are returned as a dictionary. Each key is the counter id.
+        Each value is a tuple of counts for every core.
+        If some CPU is disabled, its count will be None.
+        """
+        if self.cores_num == 1:
+            # call single core version inmplementation of base class
+            return {0: super(OocdEspXtensa, self).perfmon_dump(counter)}
+        cmd = 'xtensa perfmon_dump'
+        if counter is not None:
+            cmd += ' %d' % counter
+        resp = self.cmd_exec(cmd)
+        # Response should have one line for every counter
+        core = None
+        result = {}
+        lines = resp.split('\n')
+        for line in lines:
+            if len(line) == 0:
+                continue
+            tokens = re.match(r'CPU(?P<core>\d+):$', line)
+            if tokens:
+                core = int(tokens.group('core'))
+                if core not in result:
+                    result[core] = {}
+            else:
+                tokens = re.match(r'Counter (?P<counter>\d+): (?P<val>\d+)', line)
+                val = int(tokens.group('val'))
+                counter = int(tokens.group('counter'))
+                result[core][counter] = val
+        return result
 
 
 class GdbEspXtensa(GdbXtensa):
@@ -112,6 +146,12 @@ class OocdEsp32(OocdEspXtensa):
     """
     chip_name = 'esp32'
 
+    def __init__(self, oocd_exec=None, oocd_scripts=None, oocd_cfg_files=[], oocd_cfg_cmds=[],
+                 oocd_debug=2, oocd_args=[], host='127.0.0.1', log_level=None, log_stream_handler=None, log_file_handler=None):
+        super(OocdEsp32, self).__init__(cores_num=2, oocd_exec=oocd_exec, oocd_scripts=oocd_scripts,
+                                         oocd_cfg_files=oocd_cfg_files, oocd_cfg_cmds=oocd_cfg_cmds, oocd_debug=oocd_debug,
+                                         oocd_args=oocd_args, host=host, log_level=log_level, log_stream_handler=log_stream_handler,
+                                         log_file_handler=log_file_handler)
 
 class GdbEsp32(GdbEspXtensa):
     """
