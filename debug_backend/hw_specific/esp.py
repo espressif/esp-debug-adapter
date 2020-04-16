@@ -142,7 +142,7 @@ class GdbEspXtensa(GdbXtensa):
 
 class OocdEsp32(OocdEspXtensa):
     """
-        Class to communicate to OpenOCD supporting ESP32-specific features
+        Class to communicate to OpenOCD supporting ESP32 specific features
     """
     chip_name = 'esp32'
 
@@ -153,9 +153,10 @@ class OocdEsp32(OocdEspXtensa):
                                          oocd_args=oocd_args, host=host, log_level=log_level, log_stream_handler=log_stream_handler,
                                          log_file_handler=log_file_handler)
 
+
 class GdbEsp32(GdbEspXtensa):
     """
-        Class to communicate to GDB supporting ESP32-specific features
+        Class to communicate to GDB supporting ESP32 specific features
     """
     chip_name = 'esp32'
 
@@ -166,16 +167,36 @@ class GdbEsp32(GdbEspXtensa):
                                         log_file_handler=log_file_handler)
 
 
+class OocdEsp32Solo(OocdEspXtensa):
+    """
+        Class to communicate to OpenOCD supporting ESP32-SOLO specific features
+    """
+    chip_name = 'esp32-solo'
+
+
+class GdbEsp32Solo(GdbEspXtensa):
+    """
+        Class to communicate to GDB supporting ESP32-SOLO specific features
+    """
+    chip_name = 'esp32-solo'
+
+    def __init__(self, gdb_path='xtensa-esp32-elf-gdb', remote_target=None, extended_remote_mode=False, gdb_log_file=None,
+                 log_level=None, log_stream_handler=None, log_file_handler=None):
+        super(GdbEsp32Solo, self).__init__(gdb_path=gdb_path, remote_target=remote_target, extended_remote_mode=extended_remote_mode,
+                                        gdb_log_file=gdb_log_file, log_level=log_level, log_stream_handler=log_stream_handler,
+                                        log_file_handler=log_file_handler)
+
+
 class OocdEsp32s2(OocdEspXtensa):
     """
-        Class to communicate to OpenOCD supporting ESP32-specific features
+        Class to communicate to OpenOCD supporting ESP32-S2 specific features
     """
     chip_name = 'esp32s2'
 
 
 class GdbEsp32s2(GdbEspXtensa):
     """
-        Class to communicate to GDB supporting ESP32-specific features
+        Class to communicate to GDB supporting ESP32-S2 specific features
     """
     chip_name = 'esp32s2'
 
