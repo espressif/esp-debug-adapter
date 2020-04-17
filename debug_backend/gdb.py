@@ -196,9 +196,9 @@ class Gdb(object):
     def console_cmd_run(self, cmd):
         self._mi_cmd_run("-interpreter-exec console \"%s\"" % cmd)
 
-    def target_select(self, tgt_type, tgt_params):
+    def target_select(self, tgt_type, tgt_params, tmo=5):
         # -target-select type parameters
-        res, _ = self._mi_cmd_run('-target-select %s %s' % (tgt_type, tgt_params))
+        res, _ = self._mi_cmd_run('-target-select %s %s' % (tgt_type, tgt_params), tmo=tmo)
         if res != 'connected':
             raise DebuggerError('Failed to connect to "%s %s"!' % (tgt_type, tgt_params))
 
@@ -418,12 +418,12 @@ class Gdb(object):
     def get_current_wp_val(self):
         return self._curr_wp_val
 
-    def connect(self):
+    def connect(self, tmo=5):
         self._logger.debug('Connect to %s', self._remote_target)
         if self._remote_target is None:
             return
         remote_mode = 'extended_remote' if self._extended_remote_mode else 'remote'
-        self.target_select(remote_mode, self._remote_target)
+        self.target_select(remote_mode, self._remote_target, tmo=tmo)
 
     def disconnect(self):
         self.target_disconnect()
