@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 AUTHOR = 'Andrei Gramakov'
 MAINTAINER = 'Andrei Gramakov'
@@ -9,9 +9,6 @@ VERSION = '1.0.0'
 SHORT_DESCRIPTION = 'This package provides extented capabilities to interacting with ESP chips via GDB and OpenOCD.'
 LICENSE = 'MIT'
 URL = ''
-PACKAGES = [  # All packages and sub-packages must be listed here
-    NAME,
-]
 SCRIPTS = [  # All scripts must be listed here
     'scripts/run_tests.py'
 ]
@@ -40,7 +37,7 @@ setup(
     url=URL,
     platforms='Cross Platform',
     classifiers=['Programming Language :: Python :: 3'],
-    packages=PACKAGES,
+    packages=find_packages(),
     scripts=SCRIPTS,
     install_requires=REQUIREMENTS
 )
