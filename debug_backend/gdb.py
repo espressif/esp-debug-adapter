@@ -135,22 +135,20 @@ class Gdb(object):
         # self._logger.debug('cached recs: %s', pformat(self._resp_cache))
         return result, result_body
 
-    def _mi_cmd_run(self, cmd, new_tgt_state=None, tmo=5):
-        def _mi_cmd_isdone(cmd, response):
-            if len(response):
-                # TODO: less hardcode
-                if cmd in ['-exec-step', '-exec-next', '-exec-continue', '-exec-continue --all', '-exec-finish']:
-                    if response[-1].get('message') == 'stopped':
-                        return True
-                elif cmd == '-thread-info':
-                    if (response[-1].get('message') == 'done') or \
-                            (len(response) > 1 and response[-2].get('message') == 'done' and
-                             response[-1].get('message') == 'thread-selected'):
-                        return True
-            else:
-                if response[-1].get('message') == 'done':
+    def _mi_cmd_run(self, cmd, new_target_state=None, response_on_success=["done"], tmo=5):
+        def is_sublist(what, where):
+            for i in range(len(where)):
+                if what == where[i:i + len(what)]:
                     return True
             return False
+
+        def _mi_cmd_isdone(response, response_on_success):
+            if not len(response_on_success):
+                return True
+            if len(response) < len(response_on_success):
+                return False
+            r_list = [str(i.get('message')) for i in response]
+            return is_sublist(response_on_success, r_list)
 
         with self._gdbmi_lock:
             self._logger.debug('MI->: %s', cmd)
@@ -164,14 +162,14 @@ class Gdb(object):
                     while time.time() <= end and not done:  # while time is not up
                         r = self._gdbmi.get_gdb_response(timeout_sec=0, raise_error_on_timeout=False)
                         response += r
-                        done = _mi_cmd_isdone(cmd, response)
+                        done = _mi_cmd_isdone(response, response_on_success)
                 except Exception as e:
                     self._gdbmi.verify_valid_gdb_subprocess()
             else:
                 while len(response) == 0:
                     response = self._gdbmi.write(cmd, raise_error_on_timeout=False)
             self._logger.debug('MI<-:\n%s', pformat(response))
-            res, res_body = self._parse_mi_resp(response, new_tgt_state)  # None, None if empty
+            res, res_body = self._parse_mi_resp(response, new_target_state)  # None, None if empty
             while not res:
                 # check for result report from GDB
                 response = self._gdbmi.get_gdb_response(0, raise_error_on_timeout=False)
@@ -181,7 +179,7 @@ class Gdb(object):
                             'Failed to wait for completion of command "%s" / %s!' % (cmd, tmo))
                 else:
                     self._logger.debug('MI<-:\n%s', pformat(response))
-                    res, res_body = self._parse_mi_resp(response, new_tgt_state)  # None, None if empty
+                    res, res_body = self._parse_mi_resp(response, new_target_state)  # None, None if empty
         return res, res_body
 
     def stream_handler_set(self, stream_type, handler):
@@ -191,10 +189,10 @@ class Gdb(object):
 
     def gdb_exit(self, tmo=5):
         """ -gdb-exit ~= quit """
-        self._mi_cmd_run("-gdb-exit", tmo=tmo)
+        self._mi_cmd_run("-gdb-exit", response_on_success=[], tmo=tmo)
 
-    def console_cmd_run(self, cmd, tmo=5):
-        self._mi_cmd_run("-interpreter-exec console \"%s\"" % cmd, tmo=tmo)
+    def console_cmd_run(self, cmd, response_on_success_list=["done"], tmo=5):
+        self._mi_cmd_run("-interpreter-exec console \"%s\"" % cmd, response_on_success_list=["done"], tmo=tmo)
 
     def target_select(self, tgt_type, tgt_params, tmo=5):
         # -target-select type parameters
@@ -230,7 +228,7 @@ class Gdb(object):
 
     def exec_continue(self):
         # -exec-continue [--reverse] [--all|--thread-group N]
-        res, _ = self._mi_cmd_run('-exec-continue --all')
+        res, _ = self._mi_cmd_run('-exec-continue --all', response_on_success=["running"])
         if res != 'running':
             raise DebuggerError('Failed to continue program!')
 
@@ -252,19 +250,19 @@ class Gdb(object):
 
     def exec_next(self):
         # -exec-next [--reverse]
-        res, _ = self._mi_cmd_run('-exec-next')
+        res, _ = self._mi_cmd_run('-exec-next', response_on_success=["running"])
         if res != 'running':
             raise DebuggerError('Failed to step over!')
 
     def exec_step(self):
         # -exec-step [--reverse]
-        res, _ = self._mi_cmd_run('-exec-step')
+        res, _ = self._mi_cmd_run('-exec-step', response_on_success=["running"])
         if res != 'running':
             raise DebuggerError('Failed to step in!')
 
     def exec_finish(self):
         # -exec-finish [--reverse]
-        res, _ = self._mi_cmd_run('-exec-finish')
+        res, _ = self._mi_cmd_run('-exec-finish', response_on_success=["running"])
         if res != 'running':
             raise DebuggerError('Failed to step out!')
 

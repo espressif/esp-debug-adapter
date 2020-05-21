@@ -16,17 +16,17 @@ def _look_for_subclasses(scope, chip_name, cls_obj):
 
 
 def create_gdb(chip_name=None,
-            gdb_path=None,
-            remote_target=None,
-            extended_remote_mode=False,
-            gdb_log_file=None,
-            log_level=None,
-            log_stream_handler=None,
-            log_file_handler=None,
-            scope=None):
+               gdb_path=None,
+               remote_target=None,
+               extended_remote_mode=False,
+               gdb_log_file=None,
+               log_level=None,
+               log_stream_handler=None,
+               log_file_handler=None,
+               scope=None):
     """
-        Cretates GDB instance for specified chip name.
-        See Gdb.__init__() for undocumented parametrs.
+        Creates GDB instance for specified chip name.
+        See Gdb.__init__() for undocumented parameters.
 
         scope : dict
             Dictionary representing symbol table to look for GDB classes.
@@ -38,29 +38,29 @@ def create_gdb(chip_name=None,
     """
     gdb_cls = _look_for_subclasses(scope, chip_name, Gdb)
     return gdb_cls(gdb_path=gdb_path,
-                    remote_target=remote_target,
-                    extended_remote_mode=extended_remote_mode,
-                    gdb_log_file=gdb_log_file,
-                    log_level=log_level,
-                    log_stream_handler=log_stream_handler,
-                    log_file_handler=log_file_handler)
+                   remote_target=remote_target,
+                   extended_remote_mode=extended_remote_mode,
+                   gdb_log_file=gdb_log_file,
+                   log_level=log_level,
+                   log_stream_handler=log_stream_handler,
+                   log_file_handler=log_file_handler)
 
 
 def create_oocd(chip_name=None,
-             oocd_exec=None,
-             oocd_scripts=None,
-             oocd_cfg_files=[],
-             oocd_cfg_cmds=[],
-             oocd_debug=2,
-             oocd_args=[],
-             host='localhost',
-             log_level=None,
-             log_stream_handler=None,
-             log_file_handler=None,
-             scope=None):
+                oocd_exec=None,
+                oocd_scripts=None,
+                oocd_cfg_files=[],
+                oocd_cfg_cmds=[],
+                oocd_debug=2,
+                oocd_args=[],
+                host='localhost',
+                log_level=None,
+                log_stream_handler=None,
+                log_file_handler=None,
+                scope=None):
     """
-        Cretates OOCD instance for specified chip name.
-        See Oocd.__init__() for undocumented parametrs.
+        Creates OOCD instance for specified chip name.
+        See Oocd.__init__() for undocumented parameters.
 
         scope : dict
             Dictionary representing symbol table to look for OOCD classes.
