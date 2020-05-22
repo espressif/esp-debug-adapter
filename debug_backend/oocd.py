@@ -64,7 +64,7 @@ class Oocd(threading.Thread):
         if oocd_scripts is not None:
             oocd_full_args += ['-s', oocd_scripts]
         for c in oocd_cfg_cmds:
-            oocd_full_args += ['-c', "'%s'" % c]
+            oocd_full_args += ['-c', '%s' % c]
         for f in oocd_cfg_files:
             oocd_full_args += ['-f', '%s' % f]
         oocd_full_args += ['-d%d' % oocd_debug]
