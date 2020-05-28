@@ -189,12 +189,12 @@ class Gdb(object):
             raise DebuggerError('Unsupported stream type "%s"' % stream_type)
         self.stream_handlers[stream_type] = handler
 
-    def gdb_exit(self):
+    def gdb_exit(self, tmo=5):
         """ -gdb-exit ~= quit """
-        self._mi_cmd_run("-gdb-exit")
+        self._mi_cmd_run("-gdb-exit", tmo=tmo)
 
-    def console_cmd_run(self, cmd):
-        self._mi_cmd_run("-interpreter-exec console \"%s\"" % cmd)
+    def console_cmd_run(self, cmd, tmo=5):
+        self._mi_cmd_run("-interpreter-exec console \"%s\"" % cmd, tmo=tmo)
 
     def target_select(self, tgt_type, tgt_params, tmo=5):
         # -target-select type parameters
@@ -206,10 +206,10 @@ class Gdb(object):
         # -target-disconnect
         self._mi_cmd_run('-target-disconnect')
 
-    def target_reset(self, action='halt'):
+    def target_reset(self, action='halt', tmo=5):
         self.monitor_run('reset %s' % action)
         if action == 'halt':
-            self.wait_target_state(TARGET_STATE_STOPPED, 5)
+            self.wait_target_state(TARGET_STATE_STOPPED, tmo=tmo)
             self.console_cmd_run('flushregs')
 
     def exec_file_set(self, file_path):
