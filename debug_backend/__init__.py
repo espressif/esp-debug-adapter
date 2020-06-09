@@ -18,7 +18,7 @@ def _look_for_subclasses(scope, chip_name, cls_obj):
 def create_gdb(chip_name=None,
                gdb_path=None,
                remote_target=None,
-               extended_remote_mode=False,
+               extended_remote_mode=None,
                gdb_log_file=None,
                log_level=None,
                log_stream_handler=None,
@@ -36,14 +36,23 @@ def create_gdb(chip_name=None,
         -------
         Gdb instance for specified chip name
     """
+    gdb_init_args = {}
+    if gdb_path is not None:
+        gdb_init_args['gdb_path'] = gdb_path
+    if remote_target is not None:
+        gdb_init_args['remote_target'] = remote_target
+    if extended_remote_mode is not None:
+        gdb_init_args['extended_remote_mode'] = extended_remote_mode
+    if gdb_log_file is not None:
+        gdb_init_args['gdb_log_file'] = gdb_log_file
+    if log_level is not None:
+        gdb_init_args['log_level'] = log_level
+    if log_stream_handler is not None:
+        gdb_init_args['log_stream_handler'] = log_stream_handler
+    if log_file_handler is not None:
+        gdb_init_args['log_file_handler'] = log_file_handler
     gdb_cls = _look_for_subclasses(scope, chip_name, Gdb)
-    return gdb_cls(gdb_path=gdb_path,
-                   remote_target=remote_target,
-                   extended_remote_mode=extended_remote_mode,
-                   gdb_log_file=gdb_log_file,
-                   log_level=log_level,
-                   log_stream_handler=log_stream_handler,
-                   log_file_handler=log_file_handler)
+    return gdb_cls(**gdb_init_args)
 
 
 def create_oocd(chip_name=None,
@@ -70,14 +79,27 @@ def create_oocd(chip_name=None,
         -------
         OOCD instance for specified chip name
     """
+
+    oocd_init_args = {}
+    if oocd_exec is not None:
+        oocd_init_args['oocd_exec'] = oocd_exec
+    if oocd_scripts is not None:
+        oocd_init_args['oocd_scripts'] = oocd_scripts
+    if oocd_cfg_files is not None:
+        oocd_init_args['oocd_cfg_files'] = oocd_cfg_files
+    if oocd_cfg_cmds is not None:
+        oocd_init_args['oocd_cfg_cmds'] = oocd_cfg_cmds
+    if oocd_debug is not None:
+        oocd_init_args['oocd_debug'] = oocd_debug
+    if oocd_args is not None:
+        oocd_init_args['oocd_args'] = oocd_args
+    if host is not None:
+        oocd_init_args['host'] = host
+    if log_level is not None:
+        oocd_init_args['log_level'] = log_level
+    if log_stream_handler is not None:
+        oocd_init_args['log_stream_handler'] = log_stream_handler
+    if log_file_handler is not None:
+        oocd_init_args['log_file_handler'] = log_file_handler
     oocd_cls = _look_for_subclasses(scope, chip_name, Oocd)
-    return oocd_cls(oocd_exec=oocd_exec,
-                    oocd_scripts=oocd_scripts,
-                    oocd_cfg_files=oocd_cfg_files,
-                    oocd_cfg_cmds=oocd_cfg_cmds,
-                    oocd_debug=oocd_debug,
-                    oocd_args=oocd_args,
-                    host=host,
-                    log_level=log_level,
-                    log_stream_handler=log_stream_handler,
-                    log_file_handler=log_file_handler)
+    return oocd_cls(**oocd_init_args)

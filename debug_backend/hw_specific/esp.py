@@ -10,15 +10,16 @@ class OocdEspXtensa(OocdXtensa):
     """
 
     def __init__(self, cores_num=1, oocd_exec=None, oocd_scripts=None, oocd_cfg_files=[], oocd_cfg_cmds=[],
-                 oocd_debug=2, oocd_args=[], host='127.0.0.1', log_level=None, log_stream_handler=None, log_file_handler=None):
+                 oocd_debug=2, oocd_args=[], host='127.0.0.1', log_level=None, log_stream_handler=None,
+                 log_file_handler=None):
         super(OocdEspXtensa, self).__init__(oocd_exec=oocd_exec, oocd_scripts=oocd_scripts,
-                                         oocd_cfg_files=oocd_cfg_files, oocd_cfg_cmds=oocd_cfg_cmds, oocd_debug=oocd_debug,
-                                         oocd_args=oocd_args, host=host, log_level=log_level, log_stream_handler=log_stream_handler,
-                                         log_file_handler=log_file_handler)
+                                            oocd_cfg_files=oocd_cfg_files, oocd_cfg_cmds=oocd_cfg_cmds,
+                                            oocd_debug=oocd_debug, oocd_args=oocd_args, host=host, log_level=log_level,
+                                            log_stream_handler=log_stream_handler, log_file_handler=log_file_handler)
         self.cores_num = cores_num
 
     def set_appimage_offset(self, app_flash_off):
-        self.cmd_exec('esp appimage_offset 0x%x' % (app_flash_off))
+        self.cmd_exec('esp appimage_offset 0x%x' % app_flash_off)
 
     def set_semihost_basedir(self, semi_dir):
         self.cmd_exec('esp semihost_basedir %s' % (fixup_path(semi_dir)))
@@ -75,11 +76,12 @@ class GdbEspXtensa(GdbXtensa):
         Class to communicate to GDB supporting ESP Xtensa-specific features
     """
 
-    def __init__(self, gdb_path, remote_target=None, extended_remote_mode=False, gdb_log_file=None,
+    def __init__(self, gdb_path, remote_target='127.0.0.1:3333', extended_remote_mode=False, gdb_log_file=None,
                  log_level=None, log_stream_handler=None, log_file_handler=None):
-        super(GdbEspXtensa, self).__init__(gdb_path=gdb_path, remote_target=remote_target, extended_remote_mode=extended_remote_mode,
-                                        gdb_log_file=gdb_log_file, log_level=log_level, log_stream_handler=log_stream_handler,
-                                        log_file_handler=log_file_handler)
+        super(GdbEspXtensa, self).__init__(gdb_path=gdb_path, remote_target=remote_target,
+                                           extended_remote_mode=extended_remote_mode, gdb_log_file=gdb_log_file,
+                                           log_level=log_level, log_stream_handler=log_stream_handler,
+                                           log_file_handler=log_file_handler)
         self.app_flash_offset = 0x10000 # default for for ESP xtensa chips
 
     def target_program(self, file_name, off, actions='verify', tmo=30):
@@ -98,11 +100,11 @@ class GdbEspXtensa(GdbXtensa):
         self.monitor_run('program_esp %s %s 0x%x' % (fixup_path(file_name), actions, int(off)), tmo)
 
     def _update_memory_map(self):
-        self.monitor_run('esp appimage_offset 0x%x' % (self.app_flash_offset), 5)
+        self.monitor_run('esp appimage_offset 0x%x' % self.app_flash_offset, 5)
         self.disconnect()
         self.connect()
 
-    def exec_run(self, start=True):
+    def exec_run(self, start=True, main_func='main'):
         """
             See Gdb.exec_run().
             WARNING: This method behaves like Gdb.exec_run().
@@ -112,7 +114,7 @@ class GdbEspXtensa(GdbXtensa):
         self.wait_target_state(TARGET_STATE_STOPPED, 10)
         self._update_memory_map()
         if start:
-            self.add_bp(self.main_func, tmp=True)
+            self.add_bp(main_func, tmp=True)
         self.resume()
 
     def get_thread_info(self, thread_id=None):
@@ -146,12 +148,14 @@ class OocdEsp32(OocdEspXtensa):
     """
     chip_name = 'esp32'
 
-    def __init__(self, oocd_exec=None, oocd_scripts=None, oocd_cfg_files=[], oocd_cfg_cmds=[],
-                 oocd_debug=2, oocd_args=[], host='127.0.0.1', log_level=None, log_stream_handler=None, log_file_handler=None):
+    def __init__(self, oocd_exec=None, oocd_scripts=None, oocd_cfg_files=[], oocd_cfg_cmds=[], oocd_debug=2,
+                 oocd_args=[], host='127.0.0.1', log_level=None, log_stream_handler=None, log_file_handler=None):
         super(OocdEsp32, self).__init__(cores_num=2, oocd_exec=oocd_exec, oocd_scripts=oocd_scripts,
-                                         oocd_cfg_files=oocd_cfg_files, oocd_cfg_cmds=oocd_cfg_cmds, oocd_debug=oocd_debug,
-                                         oocd_args=oocd_args, host=host, log_level=log_level, log_stream_handler=log_stream_handler,
-                                         log_file_handler=log_file_handler)
+                                        oocd_cfg_files=oocd_cfg_files, oocd_cfg_cmds=oocd_cfg_cmds,
+                                        oocd_debug=oocd_debug,
+                                        oocd_args=oocd_args, host=host, log_level=log_level,
+                                        log_stream_handler=log_stream_handler,
+                                        log_file_handler=log_file_handler)
 
 
 class GdbEsp32(GdbEspXtensa):
@@ -160,11 +164,13 @@ class GdbEsp32(GdbEspXtensa):
     """
     chip_name = 'esp32'
 
-    def __init__(self, gdb_path='xtensa-esp32-elf-gdb', remote_target=None, extended_remote_mode=False, gdb_log_file=None,
-                 log_level=None, log_stream_handler=None, log_file_handler=None):
-        super(GdbEsp32, self).__init__(gdb_path=gdb_path, remote_target=remote_target, extended_remote_mode=extended_remote_mode,
-                                        gdb_log_file=gdb_log_file, log_level=log_level, log_stream_handler=log_stream_handler,
-                                        log_file_handler=log_file_handler)
+    def __init__(self, gdb_path='xtensa-esp32-elf-gdb', remote_target='127.0.0.1:3333', extended_remote_mode=False,
+                 gdb_log_file=None, log_level=None, log_stream_handler=None, log_file_handler=None):
+        super(GdbEsp32, self).__init__(gdb_path=gdb_path, remote_target=remote_target,
+                                       extended_remote_mode=extended_remote_mode,
+                                       gdb_log_file=gdb_log_file, log_level=log_level,
+                                       log_stream_handler=log_stream_handler,
+                                       log_file_handler=log_file_handler)
 
 
 class OocdEsp32Solo(OocdEspXtensa):
@@ -180,11 +186,13 @@ class GdbEsp32Solo(GdbEspXtensa):
     """
     chip_name = 'esp32-solo'
 
-    def __init__(self, gdb_path='xtensa-esp32-elf-gdb', remote_target=None, extended_remote_mode=False, gdb_log_file=None,
-                 log_level=None, log_stream_handler=None, log_file_handler=None):
-        super(GdbEsp32Solo, self).__init__(gdb_path=gdb_path, remote_target=remote_target, extended_remote_mode=extended_remote_mode,
-                                        gdb_log_file=gdb_log_file, log_level=log_level, log_stream_handler=log_stream_handler,
-                                        log_file_handler=log_file_handler)
+    def __init__(self, gdb_path='xtensa-esp32-elf-gdb', remote_target='127.0.0.1:3333', extended_remote_mode=False,
+                 gdb_log_file=None, log_level=None, log_stream_handler=None, log_file_handler=None):
+        super(GdbEsp32Solo, self).__init__(gdb_path=gdb_path, remote_target=remote_target,
+                                           extended_remote_mode=extended_remote_mode,
+                                           gdb_log_file=gdb_log_file, log_level=log_level,
+                                           log_stream_handler=log_stream_handler,
+                                           log_file_handler=log_file_handler)
 
 
 class OocdEsp32s2(OocdEspXtensa):
@@ -200,8 +208,10 @@ class GdbEsp32s2(GdbEspXtensa):
     """
     chip_name = 'esp32s2'
 
-    def __init__(self, gdb_path='xtensa-esp32s2-elf-gdb', remote_target=None, extended_remote_mode=False, gdb_log_file=None,
-                 log_level=None, log_stream_handler=None, log_file_handler=None):
-        super(GdbEsp32s2, self).__init__(gdb_path=gdb_path, remote_target=remote_target, extended_remote_mode=extended_remote_mode,
-                                        gdb_log_file=gdb_log_file, log_level=log_level, log_stream_handler=log_stream_handler,
-                                        log_file_handler=log_file_handler)
+    def __init__(self, gdb_path='xtensa-esp32s2-elf-gdb', remote_target='127.0.0.1:3333', extended_remote_mode=False,
+                 gdb_log_file=None, log_level=None, log_stream_handler=None, log_file_handler=None):
+        super(GdbEsp32s2, self).__init__(gdb_path=gdb_path, remote_target=remote_target,
+                                         extended_remote_mode=extended_remote_mode,
+                                         gdb_log_file=gdb_log_file, log_level=log_level,
+                                         log_stream_handler=log_stream_handler,
+                                         log_file_handler=log_file_handler)

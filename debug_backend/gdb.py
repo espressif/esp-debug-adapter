@@ -29,8 +29,9 @@ class Gdb(object):
             gdb_path : string
                 path to GDB executable.
             remote_target : string
-                remote target address, for possible values see https://www.sourceware.org/gdb/onlinedocs/gdb/Connecting.html.
-                Should be None for local targets.
+                remote target address, for possible values see
+                https://www.sourceware.org/gdb/onlinedocs/gdb/Connecting.html.
+                Use ""  or None value to skip the connection stage.
             extended_remote_mode : bool
                 If True extended remote mode should be used.
             gdb_log_file : string
@@ -42,7 +43,6 @@ class Gdb(object):
             log_file_handler : logging.Handler
                 Logging file handler for this object.
         """
-        self.main_func = 'main'
         self._remote_target = remote_target
         self._extended_remote_mode = extended_remote_mode
         self._logger = log.logger_init("Gdb", log_level, log_stream_handler, log_file_handler)
@@ -192,7 +192,18 @@ class Gdb(object):
         self._mi_cmd_run("-gdb-exit", response_on_success=[], tmo=tmo)
 
     def console_cmd_run(self, cmd, response_on_success=["done"], tmo=5):
-        self._mi_cmd_run("-interpreter-exec console \"%s\"" % cmd, response_on_success=["done"], tmo=tmo)
+        """
+        Execute a command in the console mode
+
+        Parameters
+        ----------
+        cmd : str
+
+        Returns
+        -------
+        res, res_body
+        """
+        return self._mi_cmd_run("-interpreter-exec console \"%s\"" % cmd, response_on_success=["done"], tmo=tmo)
 
     def target_select(self, tgt_type, tgt_params, tmo=5):
         # -target-select type parameters
@@ -232,7 +243,7 @@ class Gdb(object):
         if res != 'running':
             raise DebuggerError('Failed to continue program!')
 
-    def exec_run(self, start=True):
+    def exec_run(self, start=True, **kwargs):
         # -exec-run [ --all | --thread-group N ] [ --start ]
         if start:
             cmd = '-exec-run --all --start'
@@ -417,9 +428,10 @@ class Gdb(object):
         return self._curr_wp_val
 
     def connect(self, tmo=5):
-        self._logger.debug('Connect to %s', self._remote_target)
-        if self._remote_target is None:
+        if not self._remote_target:
+            self._logger.debug('Skipped connection to remote target')
             return
+        self._logger.debug('Connecting to %s', self._remote_target)
         remote_mode = 'extended_remote' if self._extended_remote_mode else 'remote'
         self.target_select(remote_mode, self._remote_target, tmo=tmo)
 
@@ -486,5 +498,5 @@ class Gdb(object):
                 return th
         return None
 
-    def target_program(self):
+    def target_program(self, **kwargs):
         return None
