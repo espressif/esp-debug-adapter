@@ -191,8 +191,8 @@ class Gdb(object):
         """ -gdb-exit ~= quit """
         self._mi_cmd_run("-gdb-exit", response_on_success=[], tmo=tmo)
 
-    def console_cmd_run(self, cmd, response_on_success_list=["done"], tmo=5):
-        self._mi_cmd_run("-interpreter-exec console \"%s\"" % cmd, response_on_success_list=["done"], tmo=tmo)
+    def console_cmd_run(self, cmd, response_on_success=["done"], tmo=5):
+        self._mi_cmd_run("-interpreter-exec console \"%s\"" % cmd, response_on_success=["done"], tmo=tmo)
 
     def target_select(self, tgt_type, tgt_params, tmo=5):
         # -target-select type parameters
