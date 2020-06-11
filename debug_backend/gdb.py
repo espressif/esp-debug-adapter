@@ -43,6 +43,7 @@ class Gdb(object):
             log_file_handler : logging.Handler
                 Logging file handler for this object.
         """
+        self.tmo_scale_factor = 1
         self._remote_target = remote_target
         self._extended_remote_mode = extended_remote_mode
         self._logger = log.logger_init("Gdb", log_level, log_stream_handler, log_file_handler)
@@ -155,7 +156,7 @@ class Gdb(object):
             response = []
             end = time.time()
             if tmo:
-                end += tmo
+                end += tmo * self.tmo_scale_factor
                 done = False
                 try:
                     self._gdbmi.write(cmd, read_response=False)
@@ -176,7 +177,7 @@ class Gdb(object):
                 if not len(response):
                     if tmo and (time.time() >= end):
                         raise DebuggerTargetStateTimeoutError(
-                            'Failed to wait for completion of command "%s" / %s!' % (cmd, tmo))
+                            'Failed to wait for completion of command "%s" / %s!' % (cmd, tmo * self.tmo_scale_factor))
                 else:
                     self._logger.debug('MI<-:\n%s', pformat(response))
                     res, res_body = self._parse_mi_resp(response, new_target_state)  # None, None if empty
@@ -406,7 +407,7 @@ class Gdb(object):
         with self._gdbmi_lock:
             end = time.time()
             if tmo is not None:
-                end += tmo
+                end += tmo * self.tmo_scale_factor
             while self._target_state != state:
                 if len(self._resp_cache):
                     recs = []#self._resp_cache
