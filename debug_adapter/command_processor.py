@@ -9,6 +9,7 @@
 
 import json
 import sys
+from pprint import pformat
 from queue import Queue
 from . import schema, base_schema, log
 from .tools import get_good_path, Measurement
@@ -45,7 +46,7 @@ class CommandProcessor(object):
                     on_request(protocol_message)
                 else:
                     self._logger.warning('Unhandled: %s not available in CommandProcessor.' % (method_name, ))
-                self._logger.debug("Processed command: %s\n" % protocol_message.command)
+                self._logger.debug("Processed command: %s" % protocol_message.command)
         except Exception as e:
             log.debug_exception(e)
 
@@ -79,6 +80,7 @@ class CommandProcessor(object):
         """
         m = Measurement()
         self.da.adapter_init()
+        self.generate_OutputEvent("Debug Adapter initialized\n")
         # response
         response = base_schema.build_response(request)  # type: schema.InitializeResponse
         response.body.supportsConfigurationDoneRequest = True
@@ -103,7 +105,7 @@ class CommandProcessor(object):
         if self.da.is_connection_check_mode():
             return
         r_args = request.arguments.to_dict()
-        self.da.state.no_debug = r_args.get('noDebug')
+        self.da.state.no_debug = False
         try:
             self.da.run(start=(not self.da.state.no_debug))
             success = True
@@ -113,6 +115,10 @@ class CommandProcessor(object):
         launch_response = base_schema.build_response(request)
         launch_response.success = success
         self.write_message(launch_response)  # acknowledge it
+        if success:
+            self.generate_OutputEvent("Debug Adapter is running\n")
+        else:
+            self.generate_OutputEvent("Debug Adapter is not running\n")
 
     def on_configurationDone_request(self, request):
         """
@@ -198,6 +204,50 @@ class CommandProcessor(object):
         event = schema.StoppedEvent(body)
         self.write_message(event)
 
+    def generate_OutputEvent(self, output, category=None, group=None, variablesReference=None, source=None, line=None,
+                             column=None, data=None):
+        """
+        Parameters
+        ----------
+        output:str
+            The output to report.
+        category:str
+            The output category. If not specified, 'console' is assumed.
+            Values: 'console', 'stdout', 'stderr', 'telemetry', etc.
+        group:str
+            Support for keeping an output log organized by grouping related messages.
+
+            'start': Start a new group in expanded mode. Subsequent output events are members of the group and should be
+            shown indented.
+            The 'output' attribute becomes the name of the group and is not indented.
+
+            'startCollapsed': Start a new group in collapsed mode. Subsequent output events are members of the group and
+             should be shown indented (as soon as the group is expanded).
+            The 'output' attribute becomes the name of the group and is not indented.
+
+            'end': End the current group and decreases the indentation of subsequent output events.
+            A non empty 'output' attribute is shown as the unindented end of the group.
+
+        variablesReference: int
+            If an attribute 'variablesReference' exists and its value is > 0, the output contains objects which can be
+            retrieved by passing 'variablesReference' to the 'variables' request. The value should be less than or equal
+            to 2147483647 (2^31 - 1).
+        source: schema.Source
+            An optional source location where the output was produced.
+        line: int
+            An optional source location line where the output was produced.
+        column: int
+            An optional source location column where the output was produced.
+        data:
+            Optional data to report. For the 'telemetry' category the data will be sent to telemetry, for the other
+            categories the data is shown in JSON format.
+
+        """
+        body = schema.OutputEventBody(output=output, category=category, variablesReference=variablesReference,
+                                      source=source, line=line, column=column, data=data)
+        event = schema.OutputEvent(body)
+        self.write_message(event)
+
     def generate_ContinuedEvent(self, thread_id, all_threads_continued=None):
         """
         Parameters
@@ -266,9 +316,13 @@ class CommandProcessor(object):
         threads_response.message = message
         self.write_message(threads_response)
         self.da.threads_analysis()
+        if self.da.thread_selected is not None:
+            selected_num = self.da.thread_selected
+        else:
+            selected_num = 0
         if self.da.state.threads_are_stopped:
             self.generate_StoppedEvent(reason='breakpoint',
-                                       thread_id=int(self.da.threads[0]['id']),
+                                       thread_id=int(self.da.threads[selected_num - 1]['id']),
                                        all_threads_stopped=True)
         self.da.state.threads_are_stopped = None
 
@@ -371,13 +425,27 @@ class CommandProcessor(object):
         except AttributeError:
             frame_id = None
         self.da.select_frame(frame_id)
-        result = self.da.evaluate(expression)  # no symbol and other errors processing
-        evaluate_response = base_schema.build_response(
-            request, kwargs={'body': {
-                'result': str(result),
-                'variablesReference': 0
-            }})
+        # on_evaluate_request can execute gdb command if the evaluation expression started with `-exec`
+        if len(expression) > 6 and expression[:6] == "-exec ":
+            cmd_output = ''
+
+            def get_output(output):
+                nonlocal cmd_output
+                cmd_output += output
+
+            self.da._gdb.stream_handler_set('console', get_output)
+            self.da.gdb_execute(expression[6:])
+            evaluate_response = base_schema.build_response(request, kwargs={
+                'body': {'result': cmd_output.replace("\\n", "\n"), 'variablesReference': 0}})
+
+        # if the expression did't start with  `-exec` do the evaluate command
+        else:
+            result = self.da.evaluate(expression)  # no symbol and other errors processing
+            evaluate_response = base_schema.build_response(request, kwargs={
+                'body': {'result': str(result), 'variablesReference': 0}})
         self.write_message(evaluate_response)
+        self.generate_OutputEvent(output="WARNING! This feature can't update UI after execution.",
+                                  category="console")
 
     def on_setExpression_request(self, request):
         """
@@ -433,6 +501,7 @@ class CommandProcessor(object):
         restart = r_args.get('restart')
         # doing
         disconnect_response = base_schema.build_response(request)
+        self.generate_OutputEvent("Debug Adapter stopped\n")
         self.da.adapter_stop()
         self.write_message(disconnect_response)
         if not restart:
@@ -464,6 +533,11 @@ class CommandProcessor(object):
         self.write_message(event)
 
     def on_setBreakpoints_request(self, request):
+        def try_set_once(source_path, line, condition):
+            try:
+                return self.da.break_add("%s:%s" % (source_path, line), condition=condition)
+            except Exception as e:
+                raise e
         """
         Parameters
         ----------
@@ -473,20 +547,23 @@ class CommandProcessor(object):
         bps = request.arguments.breakpoints  # type: list[dict]
         source = request.arguments.source
         self.da.break_removeall()  # clear old ones
-        try:
-            for bp in bps:
-                src_line = bp.get('line')
-                condition = bp.get("condition", '')
-                bp.update({'verified': 'true'})
-                bp.update({'source': source.to_dict()})
-                self.da.break_add(get_good_path(source.path) + ":" + str(src_line),
-                                  condition=condition)  # TODO add a condition syntax error processing
-            kwargs = {'body': schema.SetBreakpointsResponseBody(bps)}
-            success = True
-        except Exception as e:
-            log.debug_exception(e)
-            kwargs = {'body': schema.SetBreakpointsResponseBody([])}
-            success = False
+        for bp in bps:
+            src_line = bp.get('line')
+            condition = bp.get("condition", '')
+            bp.update({'verified': 'true'})
+            bp.update({'source': source.to_dict()})
+            try_count = 5
+            while try_count:
+                try_count -= 1
+                try:
+                    try_set_once(get_good_path(source.path), src_line, condition)
+                    kwargs = {'body': schema.SetBreakpointsResponseBody(bps)}
+                    success = True
+                    break
+                except Exception as e:
+                    log.debug_exception(e)
+                    kwargs = {'body': schema.SetBreakpointsResponseBody([])}
+                    success = False
         response = base_schema.build_response(request, kwargs)
         response.success = success
         self.write_message(response)

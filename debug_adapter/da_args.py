@@ -137,38 +137,38 @@ class DaArgs(object):
         board_type:str
         conn_check:bool
         debug:int
-        device_name:str
         dev_dbg:bool
-        dev_x86rq:bool
         dev_defaults:bool
+        dev_x86rq:bool
+        device_name:str
         elfpath:str
         log_file:str
         log_mult_files:bool
         oocd:str
         oocd_args:str
-        oocd_mode:str
         oocd_ip:str
-        port:int
+        oocd_mode:str
         oocd_scripts:str
+        port:int
         toolchain_prefix:str
         """
         self.app_flash_off = app_flash_off
         self.board_type = board_type
         self.conn_check = conn_check
         self.debug = debug
-        self.device_name = device_name
         self.dev_dbg = dev_dbg
-        self.dev_x86rq = dev_x86rq
         self.dev_defaults = dev_defaults
+        self.dev_x86rq = dev_x86rq
+        self.device_name = device_name
         self.elfpath = elfpath
         self.log_file = log_file
         self.log_mult_files = log_mult_files
         self.oocd = oocd
         self.oocd_args = oocd_args
-        self.oocd_mode = oocd_mode
         self.oocd_ip = oocd_ip
-        self.port = port
+        self.oocd_mode = oocd_mode
         self.oocd_scripts = oocd_scripts
+        self.port = port
         self.toolchain_prefix = toolchain_prefix
         for key in kwargs:
             setattr(self, key, kwargs[key])

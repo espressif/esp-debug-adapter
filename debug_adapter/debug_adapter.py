@@ -24,6 +24,7 @@
 
 import os
 import socket
+import tempfile
 import threading
 from datetime import datetime
 from time import sleep
@@ -44,6 +45,28 @@ A2VSC_STARTED_STRING = "DEBUG_ADAPTER_STARTED"
 A2VSC_READY2CONNECT_STRING = "DEBUG_ADAPTER_READY2CONNECT"
 A2VSC_STOPPED_STRING = "DEBUG_ADAPTER_STOPPED"
 
+class DebugAdapterStates(object):
+    running = False
+    ready = False
+    connected = False
+    initialized = False
+    configured_by_client = False
+    connection_check_mode = False
+    in_restarting_process = False
+    no_debug = False  # argument of a launch request
+    preparing_restart = False
+    gdb_started = False
+    ocd_started = False
+    wait_target_state = dbg.TARGET_STATE_UNKNOWN
+    oocd_ip = 'localhost'
+    openocd_need_run = False
+    openocd_skip_connection = False
+    threads_updated = False  # True if something called a get_threads() method
+    threads_are_stopped = None  # type: bool or None
+    # sets to False after the update processed (for example, stopEvent generated)
+    error = False
+    start_time = None  # type: str
+    toolchain_prefix = None  # type: str
 
 class DebugAdapter:
     """
@@ -64,19 +87,17 @@ class DebugAdapter:
             args = ObjFromDict(args)
 
         self.start_time = datetime.now().strftime("%Y_%m_%d_%H-%M-%S")
-        log.init(args, start_time_str=self.start_time)
+        log.init(args, start_time_str=self.start_time, da_inst=self)
         if args.debug > 2:
             import os
-            log.info("Working directory: %s" % os.getcwd())
-            log.info("Arguments: \n" + pformat(args.get_dict(), indent=4))
+            log.info_no_con("Working directory: %s" % os.getcwd())
+            log.info_no_con("Arguments: \n" + pformat(args.get_dict(), indent=4))
 
         self.args = args
-        self.__socket_stuff = {
-            'srv': None,  # typ
-            'sock_resp': None,
-            'r_file': None
-        }  # type: Dict[str, Any[socket.socket]]
-        self.state = DaStates()  # type: DaStates
+        self.__socket_stuff = {'srv': None,  # typ
+                               'sock_resp': None,
+                               'r_file': None}  # type: Dict[str, Any[socket.socket]]
+        self.state = DebugAdapterStates()  # type: DebugAdapterStates
         if isinstance(self.state.toolchain_prefix, str):
             self.state.toolchain_prefix = (self.args.toolchain_prefix.strip("'")).strip("\"")
         # openocd mode handling
@@ -97,7 +118,7 @@ class DebugAdapter:
         self.__read_from = None
         self.__write_to = None
         # === protected stuff
-        self._gdb = gdb_inst  # type: dbg.Gdb
+        self._gdb = gdb_inst  # type: dbg.GdbEspXtensa or dbg.Gdb
         self._oocd = oocd_inst  # type: dbg.Oocd
         self._thread_cache = []  # old thread states
         # === public stuff:
@@ -114,7 +135,7 @@ class DebugAdapter:
         """
         self._start_socket_listening()
         self.state.ready = False
-        log.debug("Got connection\n")
+        log.debug("Got connection")
         self.__socket_stuff['r_file'] = self.__socket_stuff['sock_resp'].makefile('rwb')
         self.__write_to = self.__socket_stuff['r_file']
         self.__read_from = self.__socket_stuff['r_file']
@@ -125,7 +146,7 @@ class DebugAdapter:
             self.__socket_stuff['srv'] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.__socket_stuff['srv'].setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.__socket_stuff['srv'].bind(('localhost', self.args.port))
-            log.info("Listening on port {}\n".format(self.args.port))
+            log.info("Listening on port {}".format(self.args.port))
             self.log_cmd(A2VSC_READY2CONNECT_STRING)
             self.__socket_stuff['srv'].listen(0)
             self.__socket_stuff['sock_resp'], _ = self.__socket_stuff['srv'].accept()
@@ -175,6 +196,8 @@ class DebugAdapter:
             self.state.error = True
             log.debug('Not connected')
 
+    def output(self, msg, category=None, source=None, line=None):
+        self.__command_processor.generate_OutputEvent(output=str(msg) + '\n', category=category, source=source, line=line)
     @staticmethod
     def log_cmd(cmd_string):
         """
@@ -184,7 +207,7 @@ class DebugAdapter:
         cmd_string : str
         """
         print(cmd_string)
-        log.cmd("Printed cmd: " + cmd_string)
+        log.cmd("Debug adapter -> Extension: " + cmd_string)
 
     @staticmethod
     def frame_id_generate(thread_id, frame_level):
@@ -285,9 +308,14 @@ class DebugAdapter:
         Starts OpenOCD (depends on input arguments) and Gdb
         """
         if self.state.openocd_need_run:
-            self.start_oocd()
-        if (not self.is_connection_check_mode()):
-            self.start_gdb()
+            self.start_oocd()  # will raise exception in case of error
+        if not self.is_connection_check_mode():
+            try:
+                self.start_gdb()
+            except Exception as e:
+                if self.state.openocd_need_run:
+                    self.stop_oocd()
+                raise e
         self.state.initialized = True
 
     def poll_target(self, *kwargs):
@@ -429,10 +457,10 @@ class DebugAdapter:
         condition : str
         src_line : str
         """
-        self._gdb.add_bp(src_line, ignore_count=0, cond=condition)
+        return self._gdb.add_bp(src_line, ignore_count=0, cond=condition)
 
     def break_removeall(self):
-        self._gdb.delete_bp("")
+        return self._gdb.delete_bp("")
 
     def is_connection_check_mode(self):
         """
@@ -488,20 +516,28 @@ class DebugAdapter:
         return self._oocd is not None
 
     def start_gdb(self):
-        """ Starting GDB and write the result into state.gdb_started attribute
+        """
+        Starting GDB and write the result into state.gdb_started attribute
         """
         if not self.is_inherited_gdb():
             try:
-                if log.LOG_TO_MULT_FILES:
+                if log.CGF_LOG_TO_MULT_FILES:
                     log_file_handler = log.get_file_handler('adapter_gdb_')
                 else:
                     log_file_handler = log.get_file_handler()
-                self._gdb = dbg.get_gdb(chip_name=self.args.device_name,
-                                        log_level=log.level,
-                                        log_file_handler=log_file_handler,
-                                        log_stream_handler=log.stream_handler,
-                                        log_gdb_proc_file="gdb_proc.log",
-                                        remote_target=(not self.state.openocd_skip_connection))
+                if self.state.openocd_skip_connection:
+                    remote_target = ""  # to not connect to anything
+                else:
+                    remote_target = None  # for the default value
+
+                # if self.args.
+                self._gdb = dbg.create_gdb(chip_name=self.args.device_name,
+                                           log_level=log.level,
+                                           log_file_handler=log_file_handler,
+                                           log_stream_handler=log.stream_handler,
+                                           gdb_log_file=os.path.join(tempfile.gettempdir(), "gdb_proc.log"),
+                                           remote_target=remote_target
+                                           )
                 self._gdb.exec_file_set(self.args.elfpath)
                 self._gdb.connect()
             except Exception as e:
@@ -516,24 +552,25 @@ class DebugAdapter:
         if not self.is_inherited_oocd():
             # if self.args.debug > 4: # TODO doesn't connecting with this
             #     oocd_args = oocd_args + ['-d']
-            if log.LOG_TO_MULT_FILES:
+            if log.CGF_LOG_TO_MULT_FILES:
                 log_file_handler = log.get_file_handler('adapter_oocd_')
             else:
                 log_file_handler = log.get_file_handler()
-            self._oocd = dbg.get_oocd(chip_name=self.args.device_name,
-                                      oocd_exec=self.args.oocd,
-                                      oocd_scripts=self.args.oocd_scripts,
-                                      oocd_args=self.args.oocd_args,
-                                      ip=self.state.oocd_ip,
-                                      log_level=log.level,
-                                      log_file_handler=log_file_handler,
-                                      log_stream_handler=log.stream_handler)
+            self._oocd = dbg.create_oocd(chip_name=self.args.device_name,
+                                         oocd_exec=self.args.oocd,
+                                         oocd_scripts=self.args.oocd_scripts,
+                                         oocd_args=self.args.oocd_args,
+                                         host=self.state.oocd_ip,
+                                         log_level=log.level,
+                                         log_file_handler=log_file_handler,
+                                         log_stream_handler=log.stream_handler
+                                         )
             self._oocd.start()
             self.state.oocd_started = True
 
     def stop_oocd(self):
         """
-        Stops OpenOCD subprocess if it was lauched
+        Stops OpenOCD subprocess if it was launched
         """
         try:
             if self.state.oocd_started:
@@ -631,6 +668,19 @@ class DebugAdapter:
         r = self._gdb.data_eval_expr(expr)
         return r
 
+    def gdb_execute(self, cmd):
+        """
+
+        Parameters
+        ----------
+        cmd :str
+            Execute a console command in GDB
+
+        Returns
+        -------
+        res, res_body
+        """
+        return self._gdb.console_cmd_run(cmd)
     def get_threads(self):
         """
         Read threads exists on target
@@ -642,6 +692,7 @@ class DebugAdapter:
                 # self.pause()
                 self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 10)
                 gdb_resp = self._gdb.get_thread_info()
+                self.thread_selected = int(gdb_resp[0])
                 self.threads = gdb_resp[1]
                 self.state.threads_updated = True
                 self.state.ready = True
@@ -681,17 +732,19 @@ class DebugAdapter:
             self._gdb.wait_target_state(dbg.TARGET_STATE_RUNNING, 5)
         self.start_target_poller(dbg.TARGET_STATE_STOPPED)
 
-    def run(self, start=False, main_func="start_cpu0"):
+    def run(self, start=False, main_func='app_main'):
         """
-        Runs a target program execution. If start==True set breakpoint at app_main
+        Runs a target program execution. If start==True set breakpoint at main_func if specified
         """
         state, rsn = self._gdb.get_target_state()
         if state == dbg.TARGET_STATE_RUNNING:
             self.pause()
-        self._gdb.exec_run(start)
+        self._gdb.exec_run(start=start, main_func=main_func)
+        if start:
+            self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 10)
 
-    def start(self):
-        self.run(start=True)
+    def start(self, main_func='app_main'):
+        self.run(start=True, main_func=main_func)
 
     def _check_run_n_stop(self):
         try:
@@ -724,26 +777,3 @@ class DebugAdapter:
         self._gdb.exec_finish()
         return self._check_run_n_stop()
 
-
-class DaStates(object):
-    running = False
-    ready = False
-    connected = False
-    initialized = False
-    configured_by_client = False
-    connection_check_mode = False
-    in_restarting_process = False
-    no_debug = False  # argument of a launch request
-    preparing_restart = False
-    gdb_started = False
-    ocd_started = False
-    wait_target_state = dbg.TARGET_STATE_UNKNOWN
-    oocd_ip = 'localhost'
-    openocd_need_run = False
-    openocd_skip_connection = False
-    threads_updated = False  # True if something called a get_threads() method
-    threads_are_stopped = None  # type: bool
-    # sets to False after the update processed (for example, stopEvent generated)
-    error = False
-    start_time = None  # type: str
-    toolchain_prefix = None  # type: str
