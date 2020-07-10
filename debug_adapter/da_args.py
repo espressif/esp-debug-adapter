@@ -37,7 +37,7 @@ h = {
     "--dev-defaults": 'Mode for development purposes',
     "--log-file": 'Path to log file.',
     "--log-mult-files": 'Log to separated files',
-    "--toolchain-prefix": '(If not set, drives by --device-name!) Toolchain prefix. If set, rewrites the value '
+    "--toolchain-prefix": '(If not set, controlled by --device-name!) Toolchain prefix. If set, rewrites the value '
     'specified by --device-name.',
     "--elfpath": 'A path to a builder elf file for debugging.',
     "--oocd": 'Path to OpenOCD binary file, (used OPENOCD_BIN envvar or (if not set) '
@@ -47,6 +47,7 @@ h = {
     "--oocd-mode": 'Cooperation with OpenOCD',
     "--oocd-ip": "Ip for remote OpenOCD connection",
     "--oocd-scripts": 'Path to OpenOCD TCL scripts (use OPENOCD_SCRIPTS envvar by default)',
+    "--cmdfile": 'Path to a command file containing commands to automatic execute during a program startup',
 }
 
 
@@ -128,6 +129,7 @@ class DaArgs(object):
                  port=43474,
                  oocd_scripts="",
                  toolchain_prefix="",
+                 cmdfile="",
                  **kwargs):
         """
 
@@ -151,6 +153,7 @@ class DaArgs(object):
         oocd_scripts:str
         port:int
         toolchain_prefix:str
+        cmdfile:str
         """
         self.app_flash_off = app_flash_off
         self.board_type = board_type
@@ -161,6 +164,7 @@ class DaArgs(object):
         self.dev_x86rq = dev_x86rq
         self.device_name = device_name
         self.elfpath = elfpath
+        self.cmdfile = cmdfile
         self.log_file = log_file
         self.log_mult_files = log_mult_files
         self.oocd = oocd

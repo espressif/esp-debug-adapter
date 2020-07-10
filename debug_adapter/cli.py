@@ -120,6 +120,7 @@ def connection_check_mode(in_args):
               default=None,
               show_default=True)
 @click.option('--elfpath', '-e', help=h['--elfpath'], default=None, type=Union[str])
+@click.option('--cmdfile', '-x', help=h['--cmdfile'], default=None, type=Union[str])
 #
 # OpenOCD parameters:
 @click.option('--oocd', '-o', help=h['--oocd'], default=os.environ.get("OPENOCD_BIN", "openocd"), show_default=True)
@@ -134,8 +135,10 @@ def connection_check_mode(in_args):
 @click.option('--oocd-scripts', '-s', help=h['--oocd-scripts'], default=None, show_default=True)
 #
 @click.pass_context
-def cli(ctx, app_flash_off, board_type, conn_check, debug, device_name, dev_dbg, dev_x86rq, dev_defaults, elfpath,
-        log_file, log_mult_files, oocd, oocd_args, oocd_mode, oocd_ip, port, oocd_scripts, toolchain_prefix):
+def cli(ctx,
+        app_flash_off, board_type, conn_check, debug, device_name, dev_dbg, dev_x86rq, dev_defaults,
+        elfpath, log_file, log_mult_files, oocd, oocd_args, oocd_mode, oocd_ip, port, oocd_scripts, toolchain_prefix,
+        cmdfile):
     args_main = ObjFromDict(ctx.params)
     # Modificators
     if args_main.dev_defaults is not None:

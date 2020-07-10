@@ -105,7 +105,7 @@ class CommandProcessor(object):
         if self.da.is_connection_check_mode():
             return
         r_args = request.arguments.to_dict()
-        self.da.state.no_debug = False
+        self.da.state.no_debug = False  # BUG: r_args.get('noDebug') is always True coming from the extension !!!
         try:
             self.da.run(start=(not self.da.state.no_debug))
             success = True

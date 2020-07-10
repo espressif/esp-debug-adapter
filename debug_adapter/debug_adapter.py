@@ -539,6 +539,8 @@ class DebugAdapter:
                                            remote_target=remote_target
                                            )
                 self._gdb.exec_file_set(self.args.elfpath)
+                if self.args.cmdfile:
+                    self._gdb.set_prog_startup_script(self.args.cmdfile)
                 self._gdb.connect()
             except Exception as e:
                 raise e
@@ -732,19 +734,22 @@ class DebugAdapter:
             self._gdb.wait_target_state(dbg.TARGET_STATE_RUNNING, 5)
         self.start_target_poller(dbg.TARGET_STATE_STOPPED)
 
-    def run(self, start=False, main_func='app_main'):
+    def run(self, start=False):
         """
         Runs a target program execution. If start==True set breakpoint at main_func if specified
         """
         state, rsn = self._gdb.get_target_state()
         if state == dbg.TARGET_STATE_RUNNING:
             self.pause()
-        self._gdb.exec_run(start=start, main_func=main_func)
+        if self.args.cmdfile:  # if a custom startup file specified, execute only it
+            self._gdb.exec_run(only_startup=True, startup_tmo=0)
+        else:
+            self._gdb.exec_run(start=start)
         if start:
             self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 10)
 
-    def start(self, main_func='app_main'):
-        self.run(start=True, main_func=main_func)
+    def start(self):
+        self.run(start=True)
 
     def _check_run_n_stop(self):
         try:
