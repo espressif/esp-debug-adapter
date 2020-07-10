@@ -111,7 +111,8 @@ class GdbEspXtensa(GdbXtensa):
                                            extended_remote_mode=extended_remote_mode, gdb_log_file=gdb_log_file,
                                            log_level=log_level, log_stream_handler=log_stream_handler,
                                            log_file_handler=log_file_handler)
-        self.app_flash_offset = 0x10000 # default for for ESP xtensa chips
+        self.app_flash_offset = 0x10000  # default for for ESP xtensa chips
+        self.prog_startup_cmdfile = os.path.join(DEFAULT_GDB_INIT_SCRIPT_DIR, "esp_init.gdb")
 
     def target_program(self, file_name, off, actions='verify', tmo=30):
         """
@@ -133,17 +134,26 @@ class GdbEspXtensa(GdbXtensa):
         self.disconnect()
         self.connect()
 
-    def exec_run(self, start=True, main_func='main'):
+    def exec_run(self, start=True, startup_tmo=5, only_startup=False):
         """
-            See Gdb.exec_run().
-            WARNING: This method behaves like Gdb.exec_run().
-            It does not wait for target to be stopped, just sets temp breakpoint and resumes.
+        Implements logic of `run` and `start` commands. Executes a startup command file in the beginning if it specified
+
+        Parameters
+        ----------
+        start : bool
+            if True `exec_run` works like `start` otherwise as `run`
+        startup_tmo : int
+            timeout for startup command file's execution
+        only_startup :bool
+            execute only a startup command file omitting other method's logic
         """
-        self.target_reset()
-        self.wait_target_state(TARGET_STATE_STOPPED, 10)
+        if self.prog_startup_cmdfile:
+            self.file_cmd_run(self.prog_startup_cmdfile, tmo=startup_tmo)
+        if only_startup:
+            return
         self._update_memory_map()
         if start:
-            self.add_bp(main_func, tmp=True)
+            self.add_bp("app_main", tmp=True)
         self.resume()
 
     def get_thread_info(self, thread_id=None):

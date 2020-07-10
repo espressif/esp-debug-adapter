@@ -1,3 +1,5 @@
+import os
+
 # ******* GDB **************************************
 # Target states
 TARGET_STATE_UNKNOWN = 0
@@ -12,6 +14,13 @@ TARGET_STOP_REASON_WP = 4
 TARGET_STOP_REASON_WP_SCOPE = 5
 TARGET_STOP_REASON_STEPPED = 6
 TARGET_STOP_REASON_FN_FINISHED = 7
+
+DEFAULT_GDB_INIT_SCRIPT_DIR = os.path.normpath(
+    os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        "hw_specific"
+    )
+)
 
 
 class DebuggerError(RuntimeError):

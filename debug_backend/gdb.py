@@ -56,6 +56,7 @@ class Gdb(object):
         self._curr_frame = None
         self._curr_wp_val = None
         # gdb config
+        self.prog_startup_cmdfile = None
         self.gdb_set("mi-async", "on")
         if gdb_log_file is not None:
             pardirs = os.path.dirname(gdb_log_file)
@@ -199,6 +200,8 @@ class Gdb(object):
         Parameters
         ----------
         cmd : str
+        response_on_success : list of expected responses on success
+        tmo
 
         Returns
         -------
@@ -208,7 +211,8 @@ class Gdb(object):
 
     def target_select(self, tgt_type, tgt_params, tmo=5):
         # -target-select type parameters
-        res, _ = self._mi_cmd_run('-target-select %s %s' % (tgt_type, tgt_params), response_on_success=["connected"], tmo=tmo)
+        res, _ = self._mi_cmd_run('-target-select %s %s' % (tgt_type, tgt_params),
+                                  response_on_success=["connected"], tmo=tmo)
         if res != 'connected':
             raise DebuggerError('Failed to connect to "%s %s"!' % (tgt_type, tgt_params))
 
@@ -244,13 +248,38 @@ class Gdb(object):
         if res != 'running':
             raise DebuggerError('Failed to continue program!')
 
-    def exec_run(self, start=True, **kwargs):
-        # -exec-run [ --all | --thread-group N ] [ --start ]
+    def file_cmd_run(self, path, tmo=5):
+        """
+        Parameters
+        ----------
+        path : str
+        tmo : int
+        """
+        # BUG: using commands changing prompt type like 'commands' is not supported
+        self.console_cmd_run('source %s' % path.replace("\\", "/"), tmo=tmo)
+
+    def exec_run(self, start=True, startup_tmo=5, only_startup=False):
+        """
+        Executes a startup command file in the beginning if it specified and then
+        executes `-exec-run [ --start ]` mi-command
+
+        Parameters
+        ----------
+        start : bool
+            if True `exec_run` works like `start` otherwise - as `run`
+        startup_tmo : int
+            timeout for startup command file's execution
+        only_startup :bool
+            execute only a startup command file omitting `run`/`start` logic
+        """
+        if self.prog_startup_cmdfile:
+            self.file_cmd_run(self.prog_startup_cmdfile, tmo=startup_tmo)
+        if only_startup:
+            return
         if start:
-            cmd = '-exec-run --all --start'
+            res, _ = self._mi_cmd_run('-exec-run --all --start', response_on_success=["running"])
         else:
-            cmd = '-exec-run --all'
-        res, _ = self._mi_cmd_run(cmd, response_on_success=["running"])
+            res, _ = self._mi_cmd_run('-exec-run --all', response_on_success=["running"])
         if res != 'running':
             raise DebuggerError('Failed to run program!')
 
@@ -294,7 +323,8 @@ class Gdb(object):
         else:
             raise DebuggerError('Failed to eval expression!')
 
-    def extract_exec_addr(self, addr_val):
+    @staticmethod
+    def extract_exec_addr(addr_val):
         sval_re = re.search('(.*)[<](.*)[>]', addr_val)
         if sval_re:
             return int(sval_re.group(1), 0)
@@ -306,7 +336,7 @@ class Gdb(object):
         return self.extract_exec_addr(sval)
 
     def gdb_set(self, var, val):
-        res,_ = self._mi_cmd_run("-gdb-set %s %s" % (var, val))
+        res, _ = self._mi_cmd_run("-gdb-set %s %s" % (var, val))
         if res != "done":
             raise DebuggerError('Failed to set variable!')
 
@@ -410,7 +440,7 @@ class Gdb(object):
                 end += tmo * self.tmo_scale_factor
             while self._target_state != state:
                 if len(self._resp_cache):
-                    recs = []#self._resp_cache
+                    recs = []  # self._resp_cache
                 else:
                     # check for target state change report from GDB
                     recs = self._gdbmi.get_gdb_response(0.5, raise_error_on_timeout=False)
@@ -501,3 +531,19 @@ class Gdb(object):
 
     def target_program(self, **kwargs):
         return None
+
+    def set_prog_startup_script(self, path):
+        """
+        Set up a startup command file which will be executed in the beginning of `exec_run` method.
+        See : https://sourceware.org/gdb/current/onlinedocs/gdb/Command-Files.html#Command-Files
+
+        Parameters
+        ----------
+        path : str or None
+            path to the command file. If None the script will not be executed
+
+        """
+        if os.path.isfile(path):
+            self.prog_startup_cmdfile = os.path.normpath(path)
+        else:
+            raise FileNotFoundError
