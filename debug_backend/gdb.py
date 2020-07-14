@@ -207,7 +207,7 @@ class Gdb(object):
         -------
         res, res_body
         """
-        return self._mi_cmd_run("-interpreter-exec console \"%s\"" % cmd, response_on_success=["done"], tmo=tmo)
+        return self._mi_cmd_run("-interpreter-exec console \"%s\"" % cmd, response_on_success=response_on_success, tmo=tmo)
 
     def target_select(self, tgt_type, tgt_params, tmo=5):
         # -target-select type parameters
@@ -235,6 +235,16 @@ class Gdb(object):
         res, _ = self._mi_cmd_run('-file-exec-and-symbols %s' % local_file_path)
         if res != 'done':
             raise DebuggerError('Failed to set program file!')
+
+    def exec_file_core_set(self, file_path):
+        local_file_path = file_path
+        if os.name == 'nt':
+            # Convert filepath from Windows format if needed
+            local_file_path = local_file_path.replace("\\", "/")
+        res, _ = self.console_cmd_run("core %s" % local_file_path)  # TODO find/add mi-command for this
+
+        if res != 'done':
+            raise DebuggerError('Failed to set the core file!')
 
     def exec_interrupt(self):
         # -exec-interrupt [--all|--thread-group N]
