@@ -428,7 +428,7 @@ class Gdb(object):
     def get_current_wp_val(self):
         return self._curr_wp_val
 
-    def connect(self, tmo=5):
+    def connect(self, tmo=10):
         if not self._remote_target:
             self._logger.debug('Skipped connection to remote target')
             return
