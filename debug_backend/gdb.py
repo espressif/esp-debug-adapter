@@ -190,7 +190,7 @@ class Gdb(object):
 
     def gdb_exit(self, tmo=5):
         """ -gdb-exit ~= quit """
-        self._mi_cmd_run("-gdb-exit", response_on_success=[], tmo=tmo)
+        self._mi_cmd_run("-gdb-exit", response_on_success=["exit"], tmo=tmo)
 
     def console_cmd_run(self, cmd, response_on_success=["done"], tmo=5):
         """
@@ -208,7 +208,7 @@ class Gdb(object):
 
     def target_select(self, tgt_type, tgt_params, tmo=5):
         # -target-select type parameters
-        res, _ = self._mi_cmd_run('-target-select %s %s' % (tgt_type, tgt_params), tmo=tmo)
+        res, _ = self._mi_cmd_run('-target-select %s %s' % (tgt_type, tgt_params), response_on_success=["connected"], tmo=tmo)
         if res != 'connected':
             raise DebuggerError('Failed to connect to "%s %s"!' % (tgt_type, tgt_params))
 
@@ -250,13 +250,13 @@ class Gdb(object):
             cmd = '-exec-run --all --start'
         else:
             cmd = '-exec-run --all'
-        res, _ = self._mi_cmd_run(cmd)
+        res, _ = self._mi_cmd_run(cmd, response_on_success=["running"])
         if res != 'running':
             raise DebuggerError('Failed to run program!')
 
     def exec_jump(self, loc):
         # -exec-jump location
-        res, _ = self._mi_cmd_run('-exec-jump %s' % loc)
+        res, _ = self._mi_cmd_run('-exec-jump %s' % loc, response_on_success=["running"])
         if res != 'running':
             raise DebuggerError('Failed to make jump in program!')
 
@@ -280,7 +280,7 @@ class Gdb(object):
 
     def exec_next_insn(self):
         # -exec-next-instruction [--reverse]
-        res, _ = self._mi_cmd_run('-exec-next-instruction')
+        res, _ = self._mi_cmd_run('-exec-next-instruction', response_on_success=["running"])
         if res != 'running':
             raise DebuggerError('Failed to step insn!')
 
