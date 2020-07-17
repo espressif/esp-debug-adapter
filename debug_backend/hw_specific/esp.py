@@ -1,4 +1,5 @@
 import os
+import time
 from ..defs import *
 from ..utils import fixup_path
 from .xtensa import *
@@ -32,10 +33,38 @@ class OocdEspXtensa(OocdXtensa):
         self.cmd_exec(cmd)
 
     def sysview_start(self, file1, file2=''):
-        self.cmd_exec('esp sysview start %s %s' % (file1, file2))
+        cmd_out = self.cmd_exec('esp sysview start %s %s' % (file1, file2))
+        if 'Targets connected.' not in cmd_out:
+            raise DebuggerError('Failed to start sysview with args "%s %s"!' % (file1, file2))
 
     def sysview_stop(self):
-        self.cmd_exec('esp sysview stop')
+        cmd_out = self.cmd_exec('esp sysview stop')
+        if 'Targets disconnected.' not in cmd_out:
+            raise DebuggerError('Failed to stop sysview!')
+
+    def apptrace_start(self, trace_args):
+        cmd_out = self.cmd_exec("esp apptrace start %s" % trace_args)
+        if 'Targets connected.' not in cmd_out:
+            raise DebuggerError('Failed to start apptrace with args "%s"!' % (trace_args))
+
+    def apptrace_stop(self):
+        cmd_out = self.cmd_exec("esp apptrace stop")
+        if 'Targets disconnected.' not in cmd_out:
+            raise DebuggerError('Failed to stop apptrace!')
+
+    def apptrace_wait_stop(self, tmo=10):
+        stopped = False
+        end = time.time()
+        if tmo:
+            end += tmo
+        while not stopped:
+            cmd_out = self.cmd_exec("esp apptrace status")
+            for line in cmd_out.splitlines():
+                if line.startswith("Tracing is STOPPED."):
+                    stopped = True
+                    break
+            if not stopped and tmo and time.time() > end:
+                raise DebuggerError('Failed to wait for apptrace stop!')
 
     def perfmon_dump(self, counter = None):
         """Run OpenOCD perfmon_dump command
@@ -141,6 +170,11 @@ class GdbEspXtensa(GdbXtensa):
     def sysview_mcore_start(self, file):
         self.monitor_run('esp sysview_mcore start %s' % (file))
 
+    def apptrace_start(self, trace_args):
+        self.monitor_run('esp apptrace start %s' % (trace_args))
+
+    def apptrace_stop(self):
+        self.monitor_run('esp apptrace stop')
 
 class OocdEsp32(OocdEspXtensa):
     """
