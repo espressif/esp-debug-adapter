@@ -200,8 +200,10 @@ class Gdb(object):
         Parameters
         ----------
         cmd : str
-        response_on_success : list of expected responses on success
-        tmo
+        response_on_success : list
+            list of expected responses on success
+        tmo : int
+            time after that command will be considered as failed
 
         Returns
         -------
@@ -265,18 +267,20 @@ class Gdb(object):
         path : str
         tmo : int
         """
+        if os.name == 'nt':
+            path = path.replace("\\", "/")
         # BUG: using commands changing prompt type like 'commands' is not supported
-        self.console_cmd_run('source %s' % path.replace("\\", "/"), tmo=tmo)
+        self.console_cmd_run('source %s' % path, tmo=tmo)
 
-    def exec_run(self, start=True, startup_tmo=5, only_startup=False):
+    def exec_run(self, start_func='main', startup_tmo=5, only_startup=False):
         """
         Executes a startup command file in the beginning if it specified and then
         executes `-exec-run [ --start ]` mi-command
 
         Parameters
         ----------
-        start : bool
-            if True `exec_run` works like `start` otherwise - as `run`
+        start_func : str
+            if not empty `exec_run` works like `start` stopping on the main function, otherwise - as `run`
         startup_tmo : int
             timeout for startup command file's execution
         only_startup :bool
@@ -286,9 +290,13 @@ class Gdb(object):
             self.file_cmd_run(self.prog_startup_cmdfile, tmo=startup_tmo)
         if only_startup:
             return
-        if start:
-            res, _ = self._mi_cmd_run('-exec-run --all --start', response_on_success=["running"])
-        else:
+        if start_func:  # if the start function specified execute `start`
+            res, _ = self._mi_cmd_run('-exec-run --all --start', response_on_success=["running"])  # stop on main()
+            if start_func != 'main':  # if we are want to use another function as a start function
+                self.wait_target_state(TARGET_STATE_STOPPED, 5)  # check if we are really stopped
+                self.add_bp(start_func, tmp=True)  # add a bp at the custom start function
+                self.exec_continue()  # and continue
+        else:  # if the start function is not specified execute `run`
             res, _ = self._mi_cmd_run('-exec-run --all', response_on_success=["running"])
         if res != 'running':
             raise DebuggerError('Failed to run program!')
@@ -481,7 +489,6 @@ class Gdb(object):
 
     def resume(self):
         self.exec_continue()
-        self.wait_target_state(TARGET_STATE_RUNNING, 5)
 
     def halt(self):
         if self._target_state == TARGET_STATE_STOPPED:

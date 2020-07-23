@@ -134,14 +134,14 @@ class GdbEspXtensa(GdbXtensa):
         self.disconnect()
         self.connect()
 
-    def exec_run(self, start=True, startup_tmo=5, only_startup=False):
+    def exec_run(self, start_func='app_main', startup_tmo=5, only_startup=False):
         """
         Implements logic of `run` and `start` commands. Executes a startup command file in the beginning if it specified
 
         Parameters
         ----------
-        start : bool
-            if True `exec_run` works like `start` otherwise as `run`
+        start_func : str
+            if not empty `exec_run` works like `start` stopping on the main function, otherwise - as `run`
         startup_tmo : int
             timeout for startup command file's execution
         only_startup :bool
@@ -149,11 +149,14 @@ class GdbEspXtensa(GdbXtensa):
         """
         if self.prog_startup_cmdfile:
             self.file_cmd_run(self.prog_startup_cmdfile, tmo=startup_tmo)
-        if only_startup:
-            return
+            if only_startup:
+                return
+        else:
+            self.target_reset()
+        self.wait_target_state(TARGET_STATE_STOPPED, 10)
         self._update_memory_map()
-        if start:
-            self.add_bp("app_main", tmp=True)
+        if start_func:
+            self.add_bp(start_func, tmp=True)
         self.resume()
 
     def get_thread_info(self, thread_id=None):
