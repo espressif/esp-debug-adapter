@@ -16,7 +16,7 @@ before_script:
     - echo $PATH
 
 test_usingx86_target:
-  image: $CI_DOCKER_REGISTRY/ubuntu-vscode:1-d2303206
+  image: $CI_DOCKER_REGISTRY/esp32-ci-env
   stage: requests_testing
   tags:
     - gdb_amd64_test
@@ -33,4 +33,4 @@ test_usingx86_target:
 
     - python3 -m pip install -r requirements.txt
     - cd $CI_PROJECT_DIR/tests
-    # - python3 ./run_tests.py
+    - python3 ./run_tests.py
