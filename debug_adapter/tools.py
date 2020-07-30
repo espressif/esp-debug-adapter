@@ -96,7 +96,7 @@ def get_good_path(srs_path):
             r = str(srs_path)
         else:
             r = win32api.GetLongPathName(win32api.GetShortPathName(srs_path))
-    except Exception as e:
+    except Exception:
         r = srs_path
     return r
 

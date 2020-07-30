@@ -9,9 +9,6 @@
 
 import json
 import sys
-import os
-import psutil
-from typing import Type
 from queue import Queue
 from . import schema, base_schema, log
 from .tools import get_good_path, Measurement
@@ -28,7 +25,6 @@ class CommandProcessor(object):
     to post protocol messages (which will be converted with 'to_dict()' and will have the 'seq' updated as
     needed).
     """
-
     def __init__(self, dbg_adapter_inst, write_queue, args):
         self.da = dbg_adapter_inst
         self.write_queue = write_queue  # type: Queue
@@ -39,17 +35,16 @@ class CommandProcessor(object):
         self.evaluation_cache_value = ""
 
     def __call__(self, protocol_message):
-        self._logger.debug('Got json: %s' % (
-            json.dumps(protocol_message.to_dict(), indent=4, sort_keys=True),))
+        self._logger.debug('Got json: %s' % (json.dumps(protocol_message.to_dict(), indent=4, sort_keys=True), ))
 
         try:
             if protocol_message.type == 'request':
-                method_name = 'on_%s_request' % (protocol_message.command,)
+                method_name = 'on_%s_request' % (protocol_message.command, )
                 on_request = getattr(self, method_name, None)  # check if we have a method  method_name
                 if on_request is not None:
                     on_request(protocol_message)
                 else:
-                    self._logger.warning('Unhandled: %s not available in CommandProcessor.' % (method_name,))
+                    self._logger.warning('Unhandled: %s not available in CommandProcessor.' % (method_name, ))
                 self._logger.debug("Processed command: %s\n" % protocol_message.command)
         except Exception as e:
             log.debug_exception(e)
@@ -64,11 +59,10 @@ class CommandProcessor(object):
         # https://microsoft.github.io/debug-adapter-protocol/specification#Events_Stopped
         st, rsn = self.da.is_stopped()
         if st:
-            stop_response_body = schema.StoppedEventBody(
-                reason='pause',
-                description='Stopped by pause request',
-                threadId=0,
-                allThreadsStopped=True)
+            stop_response_body = schema.StoppedEventBody(reason='pause',
+                                                         description='Stopped by pause request',
+                                                         threadId=0,
+                                                         allThreadsStopped=True)
             stop_response = schema.StoppedEvent(body=stop_response_body)
             self.write_message(stop_response)
             return True
@@ -172,7 +166,7 @@ class CommandProcessor(object):
         request : schema.ContinueRequest
         """
         # reading:
-        thread_id = request.arguments.threadId
+        # thread_id = request.arguments.threadId
         self.da.resume_exec()
         all = True
         # response:
@@ -196,8 +190,10 @@ class CommandProcessor(object):
         thread_id : int
         all_threads_stopped : bool
         """
-        body = schema.StoppedEventBody(reason, description='Stopped with reason: ' + str(reason),
-                                       threadId=thread_id, allThreadsStopped=all_threads_stopped,
+        body = schema.StoppedEventBody(reason,
+                                       description='Stopped with reason: ' + str(reason),
+                                       threadId=thread_id,
+                                       allThreadsStopped=all_threads_stopped,
                                        preserveFocusHint=preserve_focus_hint)
         event = schema.StoppedEvent(body)
         self.write_message(event)
@@ -233,20 +229,17 @@ class CommandProcessor(object):
         ----------
         request : schema.ThreadsRequest
         """
-
         def compose_list_for_body(adapter_threads):
             _thr_list = []
             for th in adapter_threads:
                 id_from_gdb = th['id']
                 func = str(th['frame']['func']).strip("?")
                 if func:
-                    name = "id - " + str(id_from_gdb) + ", " \
-                                                    "frame -" + th['frame']['func'] + ', ' \
-                                                                                      'targetID - ' + th['target-id']
+                    name = "id - " + str(
+                        id_from_gdb) + ", " "frame -" + th['frame']['func'] + ', ' 'targetID - ' + th['target-id']
                 else:
-                    name = "id - " + str(id_from_gdb) + ", " \
-                                                    "frame on address: " + th['frame']['addr'] + ', ' \
-                                                                                      'targetID - ' + th['target-id']
+                    name = "id - " + str(id_from_gdb) + ", " "frame on address: " + th['frame'][
+                        'addr'] + ', ' 'targetID - ' + th['target-id']
                 thread_obj = schema.Thread(int(id_from_gdb), name)
                 _thr_list.append(thread_obj.to_dict())
             return _thr_list
@@ -300,19 +293,21 @@ class CommandProcessor(object):
                 name = frame.get('addr')
             else:
                 name = frame.get('func')
-            sf = schema.StackFrame(id=self.da.frame_id_generate(thread_id, frame['level']),
-                                   name=name,
-                                   line=line,
-                                   column=0,
-                                   source=src,
-                                   # endLine=None,
-                                   # endColumn=None,
-                                   # moduleId=None,
-                                   # presentationHint=None
-                                   )
+            sf = schema.StackFrame(
+                id=self.da.frame_id_generate(thread_id, frame['level']),
+                name=name,
+                line=line,
+                column=0,
+                source=src,
+                # endLine=None,
+                # endColumn=None,
+                # moduleId=None,
+                # presentationHint=None
+            )
             stack_frames_list.append(sf.to_dict())  # to_dict because of a json encoding error
         kwargs = {
-            'body': schema.StackTraceResponseBody(stackFrames=stack_frames_list, totalFrames=len(stack_frames_list))}
+            'body': schema.StackTraceResponseBody(stackFrames=stack_frames_list, totalFrames=len(stack_frames_list))
+        }
         response = base_schema.build_response(request, kwargs)
         self.write_message(response)
 
@@ -331,8 +326,7 @@ class CommandProcessor(object):
                 name=scope['name'],
                 # variablesReference=len(scope['vals_list']),
                 variablesReference=len(scope['vals_list']),
-                expensive=False
-            )
+                expensive=False)
             scopes_for_body.append(scope_dap_obj.to_dict())
         # building a response:
         kwargs = {'body': schema.ScopesResponseBody(scopes=scopes_for_body)}
@@ -344,10 +338,9 @@ class CommandProcessor(object):
         try:
             with open(src_file_path) as file:
                 src = file.read()
-        except Exception as e:
+        except Exception:
             src = "[UNKNOWN SOURCE FILE]\n---------------------"
-        response = base_schema.build_response(request, kwargs={
-            'body': {'content': src}})  # type: schema.Source
+        response = base_schema.build_response(request, kwargs={'body': {'content': src}})  # type: schema.Source
         self.write_message(response)
 
     def on_setVariable_request(self, request):
@@ -360,8 +353,9 @@ class CommandProcessor(object):
         name = request.arguments.name
         value = request.arguments.value
         self.da.set_variable(name, value)
-        response = base_schema.build_response(request, kwargs={
-            'body': {'value': value}})  # type: schema.SetVariableResponse
+        response = base_schema.build_response(request, kwargs={'body': {
+            'value': value
+        }})  # type: schema.SetVariableResponse
         self.write_message(response)
 
     def on_evaluate_request(self, request):
@@ -378,8 +372,11 @@ class CommandProcessor(object):
             frame_id = None
         self.da.select_frame(frame_id)
         result = self.da.evaluate(expression)  # no symbol and other errors processing
-        evaluate_response = base_schema.build_response(request, kwargs={
-            'body': {'result': str(result), 'variablesReference': 0}})
+        evaluate_response = base_schema.build_response(
+            request, kwargs={'body': {
+                'result': str(result),
+                'variablesReference': 0
+            }})
         self.write_message(evaluate_response)
 
     def on_setExpression_request(self, request):
@@ -413,17 +410,13 @@ class CommandProcessor(object):
         variables_for_body = []  # type: list[schema.Variable]
         vars = self.da.get_vars(frame_id=self.da.frame_id_selected)
         for v in vars:
-            v_size = len(v['value'])
+            # v_size = len(v['value'])
             v_val = v['value']
-            v_val_fu = str(v_val)
+            # v_val_fu = str(v_val)
             # else: # TODO think about variablesReference sizes
             # if v_size > 1:
             # variablesReference = len(v['value'])
-            v_dap_obj = schema.Variable(
-                name=v['name'],
-                value=v_val,
-                variablesReference=0
-            )
+            v_dap_obj = schema.Variable(name=v['name'], value=v_val, variablesReference=0)
             variables_for_body.append(v_dap_obj.to_dict())
         kwargs = {'body': schema.VariablesResponseBody(variables=variables_for_body)}
         response = base_schema.build_response(request, kwargs)
@@ -455,9 +448,7 @@ class CommandProcessor(object):
         pause_response = base_schema.build_response(request)
         self.da.pause()
         self.write_message(pause_response)
-        self.generate_StoppedEvent(reason='pause',
-                                   thread_id=int(thread_id),
-                                   all_threads_stopped=True)
+        self.generate_StoppedEvent(reason='pause', thread_id=int(thread_id), all_threads_stopped=True)
 
     def generate_BreakpointEvent(self, reason, bp):
         """
@@ -524,9 +515,7 @@ class CommandProcessor(object):
         self.write_message(response)
 
         if result:
-            self.generate_StoppedEvent(reason='step',
-                                       thread_id=thread_id,
-                                       all_threads_stopped=True)
+            self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
         m.stop_n_check(0.5, "The step operation took too long")
 
     def on_stepIn_request(self, request):
@@ -543,9 +532,7 @@ class CommandProcessor(object):
         self.write_message(response)
 
         if result:
-            self.generate_StoppedEvent(reason='step',
-                                       thread_id=thread_id,
-                                       all_threads_stopped=True)
+            self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
 
     def on_stepOut_request(self, request):
         """
@@ -561,9 +548,7 @@ class CommandProcessor(object):
         self.write_message(response)
 
         if result:
-            self.generate_StoppedEvent(reason='step',
-                                       thread_id=thread_id,
-                                       all_threads_stopped=True)
+            self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
 
     def write_message(self, protocol_message):
         """
