@@ -489,6 +489,7 @@ class Gdb(object):
 
     def resume(self):
         self.exec_continue()
+        self.wait_target_state(TARGET_STATE_RUNNING, 5)
 
     def halt(self):
         if self._target_state == TARGET_STATE_STOPPED:
