@@ -25,8 +25,8 @@ Usage: debug_adapter_main.py [OPTIONS]
 Options:
   -a, --app_flash_off INTEGER     Program start address offset
                                   (ESP32_APP_FLASH_OFF)  [default: 65536]
-  -b, --board-type TEXT           Program start address offset
-                                  (ESP32_APP_FLASH_OFF)
+  -b, --board-type TEXT           Type of the board to run tests on (you could
+                                  use OOCD_TEST_BOARD envvar by default)
   -d, --debug INTEGER             Debug level (0-4), 5 - for a full OOCD log
                                   [default: 2]
   -dn, --device-name TEXT         The name of used hardware to debug
@@ -34,16 +34,23 @@ Options:
                                   --toolchain-prefix
   -p, --port INTEGER              Listen on given port for VS Code connections
                                   [default: 43474]
-  -cc, --conn-check               Mode for development purposes
-  -ddbg, --dev-dbg                Mode for development purposes
-  -dr, --dev-x86rq                Mode for development purposes
-  -dd, --dev-defaults             Mode for development purposes
+  -pm, --postmortem               Run the adapter without target in 'read-
+                                  only' mode
+  --developer-mode [none|connection-check|x86-test]
+                                  Modes for development purposes  [default:
+                                  none]
   -l, --log-file TEXT             Path to log file.
   -lm, --log-mult-files           Log to separated files
-  -t, --toolchain-prefix TEXT     (If not set, drives by --device-name!)
+  -t, --toolchain-prefix TEXT     (If not set, controlled by --device-name!)
                                   Toolchain prefix. If set, rewrites the value
                                   specified by --device-name.
-  -e, --elfpath TEXT              A path to a builder elf file for debugging.
+  -e, --elfpath TEXT              A path to elf files for debugging. You can
+                                  use several elf files e.g. `-e file1.elf -e
+                                  file2.elf`
+  -c, --core-file TEXT            Use a file as a core dump to examine.
+  -x, --cmdfile TEXT              Path to a command file containing commands
+                                  to automatic execute during a program
+                                  startup
   -o, --oocd TEXT                 Path to OpenOCD binary file, (used
                                   OPENOCD_BIN envvar or (if not set) 'openocd'
                                   by default)  [default: openocd]

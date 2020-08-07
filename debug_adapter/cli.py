@@ -27,87 +27,49 @@ import sys
 import click
 from typing import Union
 from .debug_adapter import A2VSC_STARTED_STRING, DebugAdapter
-from .da_args import h, DaArgsDescriptor as DAD
-from .tools import ObjFromDict, WIN32
+from .internal_classes import DaDevModes, DaOpenOcdModes, DaArgs
 
-
-def load_dev_defaults(in_args):
-    """
-    -d 5 -p 43474 -e "C:/esp/branches/vsc_adapter_testing/blink/build/blink.elf" -l ./debug.log
-
-    :param in_args:
-    :return:
-    """
-    args = in_args
-    if WIN32:
-        args.debug = 5
-        args.port = 43474
-        # args.elfpath = os.path.join(idf_path, "examples", "get-started", "blink", "build", "blink.elf")
-        args.elfpath = "C://ws//app//build//app-template.elf"
-        # args.elfpath = "/media/agramakov/Win/esp/vsc_ws/app/build/app-template.elf"
-        # args.elfpath = "C://Users//dongr//esp//esp-idf//examples//get-started//blink//build//blink.elf"
-        args.log_file = "./debug.log"
-        # args.log_mult_files = ""
-    else:
-        pass
-    return args
-
-
-def x86_test_mode(in_args):
-    """
-
-    Parameters
-    ----------
-    in_args:DaArgs
-
-    Returns
-    -------
-
-    """
-    args = in_args
-    args.debug = 5
-    args.log_file = "debug.log"
-    args.oocd_mode = "without_oocd"
-    args.toolchain_prefix = ""
-    args.elfpath = ""
-    return args
-
-
-def connection_check_mode(in_args):
-    args = in_args
-    args.debug = 4
-    args.port = 43474
-    args.oocd_mode = "without_oocd"
-    args.log_file = "debug.log"
-    return args
+h = {
+    "--app_flash_off": 'Program start address offset (ESP32_APP_FLASH_OFF)',
+    "--board-type": 'Type of the board to run tests on (you could use OOCD_TEST_BOARD envvar by default)',
+    "--debug": 'Debug level (0-4), 5 - for a full OOCD log',
+    "--developer-mode": 'Modes for development purposes',
+    "--device-name": 'The name of used hardware to debug (currently Esp32 or Esp32_S2). It defines '
+                     '--toolchain-prefix',
+    "--port": "Listen on given port for VS Code connections",
+    "--log-file": 'Path to log file.',
+    "--log-mult-files": 'Log to separated files',
+    "--toolchain-prefix": '(If not set, controlled by --device-name!) Toolchain prefix. If set, rewrites the value '
+                          'specified by --device-name.',
+    "--elfpath": 'A path to elf files for debugging. You can use several elf files e.g. `-e file1.elf -e '
+                 'file2.elf`',
+    "--core-file": 'Use a file as a core dump to examine.',
+    "--oocd": 'Path to OpenOCD binary file, (used OPENOCD_BIN envvar or (if not set) '
+              '\'openocd\' by default)',
+    "--oocd-args": "(If not set, drives by --device-name!) Specifies custom OpenOCD args. If set, rewrites the"
+                   " value specified by --device-name.",
+    "--oocd-mode": 'Cooperation with OpenOCD',
+    "--oocd-ip": "Ip for remote OpenOCD connection",
+    "--postmortem": "Run the adapter without target in \'read-only\' mode",
+    "--oocd-scripts": 'Path to OpenOCD TCL scripts (use OPENOCD_SCRIPTS envvar by default)',
+    "--cmdfile": 'Path to a command file containing commands to automatic execute during a program startup',
+}
 
 
 # TODO Toolchain from "idf.xtensaEsp32Path" settings.json
 # TODO xtensaEsp32Path -> xtensaEspToolchainPath, espToolchainPath
 @click.command()
 # Basic parameters:
-@click.option(DAD.app_flash_off.cli_long_key,
-              DAD.app_flash_off.cli_short_key,
-              show_default=True,
-              help=DAD.app_flash_off.help_str,
-              default=DAD.app_flash_off.default_value,
-              type=DAD.app_flash_off.implied_type)
-@click.option(DAD.board_type.cli_long_key,
-              DAD.board_type.cli_short_key,
-              show_default=True,
-              help=DAD.board_type.help_str,
-              default=DAD.board_type.default_value,
-              type=DAD.board_type.implied_type)  # TODO: move others to DaArgsDescriptor
+@click.option("--app_flash_off", "-a", help=h["--app_flash_off"], type=Union[int], default=0x10000, show_default=True)
+@click.option('--board-type', '-b', help=h['--board-type'], type=Union[str])
 @click.option('--debug', '-d', help=h['--debug'], type=Union[int], default=2, show_default=True)
 @click.option('--device-name', '-dn', help=h['--device-name'], type=Union[str], default=None, show_default=True)
 @click.option('--port', '-p', help=h['--port'], default=43474, show_default=True, type=Union[int])
 #
 # Specific modes:
-@click.option('--conn-check', '-cc', help=h['--conn-check'], default=None, is_flag=True)
-@click.option('--dev-dbg', '-ddbg', help=h['--dev-dbg'], default=None, is_flag=True)
-@click.option('--dev-x86rq', '-dr', help=h['--dev-x86rq'], default=None, is_flag=True)
-@click.option('--dev-defaults', '-dd', help=h['--dev-defaults'], default=None, is_flag=True)
-#
+@click.option('--postmortem', '-pm', help=h['--postmortem'], is_flag=True)
+@click.option('--developer-mode', help=h['--developer-mode'], type=click.Choice(DaDevModes.get_modes()),
+              default=DaDevModes.NONE, show_default=True)
 # logging parameters:
 @click.option('--log-file', '-l', help=h['--log-file'], type=Union[str])
 @click.option('--log-mult-files', '-lm', help=h['--log-mult-files'], default=None, is_flag=True)
@@ -119,34 +81,34 @@ def connection_check_mode(in_args):
               type=Union[str],
               default=None,
               show_default=True)
-@click.option('--elfpath', '-e', help=h['--elfpath'], default=None, type=Union[str])
+@click.option('--elfpath', '-e', help=h['--elfpath'], multiple=True, default=None, type=Union[str])
+@click.option('--core-file', '-c', help=h['--core-file'], multiple=True, default=None, type=Union[str])
 @click.option('--cmdfile', '-x', help=h['--cmdfile'], default=None, type=Union[str])
 #
 # OpenOCD parameters:
 @click.option('--oocd', '-o', help=h['--oocd'], default=os.environ.get("OPENOCD_BIN", "openocd"), show_default=True)
 @click.option('--oocd-args', '-oa', help=h['--oocd-args'], default=None, show_default=True)
-@click.option('--oocd-mode',
-              '-om',
-              help=h['--oocd-mode'],
-              type=click.Choice(('run_and_connect', 'connect_to_instance', 'without_oocd')),
-              default="connect_to_instance",
-              show_default=True)
+@click.option('--oocd-mode', '-om', help=h['--oocd-mode'], type=click.Choice(DaOpenOcdModes.get_modes()),
+              default=DaOpenOcdModes.CONNECT, show_default=True)
 @click.option('--oocd-ip', '-ip', help=h['--oocd-ip'], default='localhost', show_default=True, type=Union[str])
 @click.option('--oocd-scripts', '-s', help=h['--oocd-scripts'], default=None, show_default=True)
 #
 @click.pass_context
-def cli(ctx,
-        app_flash_off, board_type, conn_check, debug, device_name, dev_dbg, dev_x86rq, dev_defaults,
-        elfpath, log_file, log_mult_files, oocd, oocd_args, oocd_mode, oocd_ip, port, oocd_scripts, toolchain_prefix,
-        cmdfile):
-    args_main = ObjFromDict(ctx.params)
+def cli(ctx, **kwargs):
+    args_main = DaArgs(**ctx.params)
     # Modificators
-    if args_main.dev_defaults is not None:
-        args_main = load_dev_defaults(args_main)
-    if args_main.dev_x86rq is not None:
-        args_main = x86_test_mode(args_main)
-    if args_main.conn_check is not None:
-        connection_check_mode(args_main)
+    if args_main.developer_mode == DaDevModes.X86:
+        args_main.debug = 5
+        args_main.log_file = "debug.log"
+        args_main.oocd_mode = DaOpenOcdModes.NO_OOCD
+        args_main.toolchain_prefix = ""
+        args_main.elfpath = ""
+
+    if args_main.developer_mode == DaDevModes.CON_CHECK:
+        args_main.debug = 4
+        args_main.port = 43474
+        args_main.oocd_mode = DaOpenOcdModes.NO_OOCD
+        args_main.log_file = "debug.log"
     # Real work starts here
     dbg_a = DebugAdapter(args=args_main)
     dbg_a.log_cmd(A2VSC_STARTED_STRING)

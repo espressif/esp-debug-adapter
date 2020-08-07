@@ -38,6 +38,7 @@ from . import debug_backend as dbg
 from . import schema
 from . import log
 from .command_processor import CommandProcessor
+from .internal_classes import DaOpenOcdModes, DaDevModes, DaRunState, DaStates
 from .threads import ReaderThread, WriterThread
 from .tools import sys, PY2, ObjFromDict, WIN32, path_disassemble
 
@@ -45,33 +46,12 @@ A2VSC_STARTED_STRING = "DEBUG_ADAPTER_STARTED"
 A2VSC_READY2CONNECT_STRING = "DEBUG_ADAPTER_READY2CONNECT"
 A2VSC_STOPPED_STRING = "DEBUG_ADAPTER_STOPPED"
 
-class DebugAdapterStates(object):
-    running = False
-    ready = False
-    connected = False
-    initialized = False
-    configured_by_client = False
-    connection_check_mode = False
-    in_restarting_process = False
-    no_debug = False  # argument of a launch request
-    preparing_restart = False
-    gdb_started = False
-    ocd_started = False
-    wait_target_state = dbg.TARGET_STATE_UNKNOWN
-    oocd_ip = 'localhost'
-    openocd_need_run = False
-    openocd_skip_connection = False
-    threads_updated = False  # True if something called a get_threads() method
-    threads_are_stopped = None  # type: bool or None
-    # sets to False after the update processed (for example, stopEvent generated)
-    error = False
-    start_time = None  # type: str
-    toolchain_prefix = None  # type: str
 
 class DebugAdapter:
     """
     Adapter class
     """
+
     def __init__(self, args, gdb_inst=None, oocd_inst=None):
         """
         Parameters
@@ -97,20 +77,7 @@ class DebugAdapter:
         self.__socket_stuff = {'srv': None,  # typ
                                'sock_resp': None,
                                'r_file': None}  # type: Dict[str, Any[socket.socket]]
-        self.state = DebugAdapterStates()  # type: DebugAdapterStates
-        if isinstance(self.state.toolchain_prefix, str):
-            self.state.toolchain_prefix = (self.args.toolchain_prefix.strip("'")).strip("\"")
-        # openocd mode handling
-        if self.args.oocd_mode == "run_and_connect":
-            self.state.openocd_need_run = True
-            self.state.openocd_skip_connection = False
-        elif self.args.oocd_mode == "connect_to_instance":
-            self.state.openocd_need_run = False
-            self.state.openocd_skip_connection = False
-            self.state.oocd_ip = args.oocd_ip
-        else:  # without_oocd
-            self.state.openocd_need_run = False
-            self.state.openocd_skip_connection = True
+        self.state = DaStates()  # type: DaStates
 
         # === private stuff:
         self.__write_queue = Queue()
@@ -134,12 +101,10 @@ class DebugAdapter:
         Starts listen to socket. After the connection creates file for data reading and writing
         """
         self._start_socket_listening()
-        self.state.ready = False
         log.debug("Got connection")
         self.__socket_stuff['r_file'] = self.__socket_stuff['sock_resp'].makefile('rwb')
         self.__write_to = self.__socket_stuff['r_file']
         self.__read_from = self.__socket_stuff['r_file']
-        self.state.ready = True
 
     def _start_socket_listening(self):
         try:
@@ -184,20 +149,20 @@ class DebugAdapter:
         """
         self._gdb = gdb_inst
         self._oocd = oocd_inst
-        log.info('Starting. Cmd: %s\n' % (' '.join(sys.argv), ))
-        if self.args.conn_check is not None:
-            self.state.connection_check_mode = True
+        log.info('Starting. Cmd: %s\n' % (' '.join(sys.argv),))
         self.adapter_connect()
-        if self.state.connected:
+        if self.state.run_state >= DaRunState.CONNECTED:
             self.reader.start()
             self.writer.start()
-            self.state.running = True
+            self.state.run_state = DaRunState.RUNNING
         else:
             self.state.error = True
             log.debug('Not connected')
 
     def output(self, msg, category=None, source=None, line=None):
-        self.__command_processor.generate_OutputEvent(output=str(msg) + '\n', category=category, source=source, line=line)
+        self.__command_processor.generate_OutputEvent(output=str(msg) + '\n', category=category, source=source,
+                                                      line=line)
+
     @staticmethod
     def log_cmd(cmd_string):
         """
@@ -246,7 +211,6 @@ class DebugAdapter:
         return thread_id, frame_level
 
     def adapter_restart(self):  # TODO think about removing
-        self.state.ready = False
         # self._stopped = True
         old_reader = self.reader
         old_writer = self.writer
@@ -259,7 +223,7 @@ class DebugAdapter:
         old_writer._stop = True
         old_reader._stop = True
 
-        if self.state.openocd_need_run:
+        if self.args.oocd_mode == DaOpenOcdModes.RUN_AND_CONNECT:
             self.stop_oocd()
         self.stop_gdb()
 
@@ -270,7 +234,7 @@ class DebugAdapter:
         try:
             self.stop_target_poller()
             self.stop_gdb()
-            if self.state.openocd_need_run:
+            if self.args.oocd_mode == DaOpenOcdModes.RUN_AND_CONNECT:
                 self.stop_oocd()
             self.stop_writer_thread()
             self.stop_reader_thread()
@@ -278,11 +242,11 @@ class DebugAdapter:
         except Exception as e:
             log.debug_exception(e)
             self.state.error = True
-        self.state.running = False
+        self.state.run_state = DaRunState.STOPPED
         self.log_cmd(A2VSC_STOPPED_STRING)
 
     def adapter_connect(self):
-        if not self.state.connected:
+        if self.state.run_state < DaRunState.CONNECTED:
             if self.args.port is not None:
                 self._wait_for_connection()
             else:
@@ -299,7 +263,7 @@ class DebugAdapter:
                     self.__read_from = sys.stdin.buffer
             self.reader = ReaderThread(self.__read_from, self.__command_processor)
             self.writer = WriterThread(self.__write_to, self.__write_queue)
-            self.state.connected = True
+            self.state.run_state = DaRunState.CONNECTED
         else:
             log.debug('Already connected')
 
@@ -307,16 +271,16 @@ class DebugAdapter:
         """
         Starts OpenOCD (depends on input arguments) and Gdb
         """
-        if self.state.openocd_need_run:
+        if self.args.oocd_mode == DaOpenOcdModes.RUN_AND_CONNECT:
             self.start_oocd()  # will raise exception in case of error
-        if not self.is_connection_check_mode():
+        if self.args.developer_mode != DaDevModes.CON_CHECK:
             try:
                 self.start_gdb()
             except Exception as e:
-                if self.state.openocd_need_run:
+                if self.args.oocd_mode == DaOpenOcdModes.RUN_AND_CONNECT:
                     self.stop_oocd()
                 raise e
-        self.state.initialized = True
+        self.state.run_state = DaRunState.INITIALIZED
 
     def poll_target(self, *kwargs):
         log.info("Poll target")
@@ -462,15 +426,6 @@ class DebugAdapter:
     def break_removeall(self):
         return self._gdb.delete_bp("")
 
-    def is_connection_check_mode(self):
-        """
-
-        Returns
-        -------
-        bool : if the connection_check_mode is used (read DA help)
-        """
-        return self.state.connection_check_mode
-
     def is_stopped(self):
         """
         Returns
@@ -525,7 +480,7 @@ class DebugAdapter:
                     log_file_handler = log.get_file_handler('adapter_gdb_')
                 else:
                     log_file_handler = log.get_file_handler()
-                if self.state.openocd_skip_connection:
+                if self.args.oocd_mode == DaOpenOcdModes.NO_OOCD:
                     remote_target = ""  # to not connect to anything
                 else:
                     remote_target = None  # for the default value
@@ -538,7 +493,10 @@ class DebugAdapter:
                                            gdb_log_file=os.path.join(tempfile.gettempdir(), "gdb_proc.log"),
                                            remote_target=remote_target
                                            )
-                self._gdb.exec_file_set(self.args.elfpath)
+                for elf in self.args.elfpath:
+                    self._gdb.exec_file_set(elf)
+                for core in self.args.core_file:
+                    self._gdb.exec_file_core_set(core)
                 if self.args.cmdfile:
                     self._gdb.set_prog_startup_script(self.args.cmdfile)
                 self._gdb.connect()
@@ -562,7 +520,7 @@ class DebugAdapter:
                                          oocd_exec=self.args.oocd,
                                          oocd_scripts=self.args.oocd_scripts,
                                          oocd_args=self.args.oocd_args,
-                                         host=self.state.oocd_ip,
+                                         host=self.args.oocd_ip,
                                          log_level=log.level,
                                          log_file_handler=log_file_handler,
                                          log_stream_handler=log.stream_handler
@@ -632,6 +590,7 @@ class DebugAdapter:
         ----------
         force_upd : bool
         """
+
         def are_all_stopped(threads):
             for t in threads:
                 if t['state'] != "stopped":
@@ -683,26 +642,23 @@ class DebugAdapter:
         res, res_body
         """
         return self._gdb.console_cmd_run(cmd)
+
     def get_threads(self):
         """
         Read threads exists on target
         """
-        self.state.ready = False
         try_num = 0
         while try_num < 3:
             try:
-                # self.pause()
                 self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 10)
                 gdb_resp = self._gdb.get_thread_info()
                 self.thread_selected = int(gdb_resp[0])
                 self.threads = gdb_resp[1]
                 self.state.threads_updated = True
-                self.state.ready = True
                 return True
             except dbg.DebuggerTargetStateTimeoutError as e:
                 log.debug(e)
                 try_num += 1
-        self.state.ready = True
         return False
 
     def stop_exec(self):
@@ -741,12 +697,13 @@ class DebugAdapter:
         state, rsn = self._gdb.get_target_state()
         if state == dbg.TARGET_STATE_RUNNING:
             self.pause()
-        if self.args.cmdfile:  # if a custom startup file specified, execute only it
-            self._gdb.exec_run(only_startup=True, startup_tmo=0)
-        else:
-            self._gdb.exec_run(start=start)
-        if start:
-            self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 10)
+        if not self.args.postmortem:
+            if self.args.cmdfile:  # if a custom startup file specified, execute only it
+                self._gdb.exec_run(only_startup=True, startup_tmo=0)
+            else:
+                self._gdb.exec_run(start_func="app_main")
+            if start:
+                self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 10)
 
     def start(self):
         self.run(start=True)
@@ -777,8 +734,7 @@ class DebugAdapter:
 
     def step_out(self):
         """
-        Runs until current function retunrs (step out, "finish" command in GDB)
+        Runs until current function returns (step out, "finish" command in GDB)
         """
         self._gdb.exec_finish()
         return self._check_run_n_stop()
-

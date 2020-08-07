@@ -51,6 +51,7 @@ def da():
     global __da
     return __da
 
+
 class DebugAdapterLogger(Logger):
     def __init__(self, name, level=NOTSET, da_inst=None, with_console_output=True):
         """
@@ -113,7 +114,6 @@ class DebugAdapterLogger(Logger):
 
     def exception_no_con(self, msg, *args, **kwargs):
         super(DebugAdapterLogger, self).exception(msg, *args, **kwargs)
-
 
 
 def getLogger(name=None, with_console_output=True):
