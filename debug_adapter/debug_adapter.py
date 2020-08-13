@@ -22,6 +22,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+import os
 import socket
 import threading
 from datetime import datetime
@@ -36,9 +37,8 @@ from . import debug_backend as dbg
 from . import schema
 from . import log
 from .command_processor import CommandProcessor
-from .da_args import DaArgs
-from .threads import KillerThread, ReaderThread, WriterThread
-from .tools import *
+from .threads import ReaderThread, WriterThread
+from .tools import sys, PY2, ObjFromDict, WIN32, path_disassemble
 
 A2VSC_STARTED_STRING = "DEBUG_ADAPTER_STARTED"
 A2VSC_READY2CONNECT_STRING = "DEBUG_ADAPTER_READY2CONNECT"
@@ -49,7 +49,6 @@ class DebugAdapter:
     """
     Adapter class
     """
-
     def __init__(self, args, gdb_inst=None, oocd_inst=None):
         """
         Parameters
@@ -72,9 +71,11 @@ class DebugAdapter:
             log.info("Arguments: \n" + pformat(args.get_dict(), indent=4))
 
         self.args = args
-        self.__socket_stuff = {'srv': None,  # typ
-                               'sock_resp': None,
-                               'r_file': None}  # type: Dict[str, Any[socket.socket]]
+        self.__socket_stuff = {
+            'srv': None,  # typ
+            'sock_resp': None,
+            'r_file': None
+        }  # type: Dict[str, Any[socket.socket]]
         self.state = DaStates()  # type: DaStates
         if isinstance(self.state.toolchain_prefix, str):
             self.state.toolchain_prefix = (self.args.toolchain_prefix.strip("'")).strip("\"")
@@ -96,7 +97,6 @@ class DebugAdapter:
         self.__read_from = None
         self.__write_to = None
         # === protected stuff
-        self._killer = KillerThread()
         self._gdb = gdb_inst  # type: dbg.Gdb
         self._oocd = oocd_inst  # type: dbg.Oocd
         self._thread_cache = []  # old thread states
@@ -163,7 +163,7 @@ class DebugAdapter:
         """
         self._gdb = gdb_inst
         self._oocd = oocd_inst
-        log.info('Starting. Cmd: %s\n' % (' '.join(sys.argv),))
+        log.info('Starting. Cmd: %s\n' % (' '.join(sys.argv), ))
         if self.args.conn_check is not None:
             self.state.connection_check_mode = True
         self.adapter_connect()
@@ -293,24 +293,23 @@ class DebugAdapter:
     def poll_target(self, *kwargs):
         log.info("Poll target")
         if self.state.wait_target_state == dbg.TARGET_STATE_STOPPED:
-            stopped,rsn_str = self.is_stopped()
+            stopped, rsn_str = self.is_stopped()
             if stopped:
                 self.state.wait_target_state = dbg.TARGET_STATE_UNKNOWN
-                self.__command_processor.generate_StoppedEvent(reason=rsn_str,
-                                                               thread_id=0,
-                                                               all_threads_stopped=True)
+                self.__command_processor.generate_StoppedEvent(reason=rsn_str, thread_id=0, all_threads_stopped=True)
         elif self.state.wait_target_state == dbg.TARGET_STATE_RUNNING:
             # this is not fully implemented yet, need to define when we need to start waiting for target get running
             try:
                 self._gdb.wait_target_state(dbg.TARGET_STATE_RUNNING, 0)
                 self.state.wait_target_state = dbg.TARGET_STATE_UNKNOWN
-                self.__command_processor.generate_ContinuedEvent(thread_id=0,
-                                                                all_threads_continued=True)
+                self.__command_processor.generate_ContinuedEvent(thread_id=0, all_threads_continued=True)
             except dbg.DebuggerTargetStateTimeoutError:
                 pass
         if self.state.wait_target_state != dbg.TARGET_STATE_UNKNOWN:
             # restart timer if we still need to wait for target state
-            self.target_poller = threading.Timer(1.0, self.poll_target, args=[self,])
+            self.target_poller = threading.Timer(1.0, self.poll_target, args=[
+                self,
+            ])
             self.target_poller.start()
 
     def reset(self):
@@ -399,8 +398,7 @@ class DebugAdapter:
         self.select_frame(frame_id)
         s = []
         v_list = self._gdb.get_local_variables(no_values=True)
-        s.append({'name': 'Local',
-                  'vals_list': v_list})
+        s.append({'name': 'Local', 'vals_list': v_list})
         return s
 
     def get_vars(self, frame_id=None):
@@ -503,8 +501,7 @@ class DebugAdapter:
                                         log_file_handler=log_file_handler,
                                         log_stream_handler=log.stream_handler,
                                         log_gdb_proc_file="gdb_proc.log",
-                                        remote_target=(not self.state.openocd_skip_connection)
-                                        )
+                                        remote_target=(not self.state.openocd_skip_connection))
                 self._gdb.exec_file_set(self.args.elfpath)
                 self._gdb.connect()
             except Exception as e:
@@ -530,8 +527,7 @@ class DebugAdapter:
                                       ip=self.state.oocd_ip,
                                       log_level=log.level,
                                       log_file_handler=log_file_handler,
-                                      log_stream_handler=log.stream_handler
-                                      )
+                                      log_stream_handler=log.stream_handler)
             self._oocd.start()
             self.state.oocd_started = True
 
@@ -565,7 +561,9 @@ class DebugAdapter:
 
     def start_target_poller(self, state):
         self.state.wait_target_state = state
-        self.target_poller = threading.Timer(1.0, self.poll_target, args=[self,])
+        self.target_poller = threading.Timer(1.0, self.poll_target, args=[
+            self,
+        ])
         self.target_poller.start()
 
     def stop_target_poller(self):
@@ -595,7 +593,6 @@ class DebugAdapter:
         ----------
         force_upd : bool
         """
-
         def are_all_stopped(threads):
             for t in threads:
                 if t['state'] != "stopped":
@@ -745,7 +742,7 @@ class DaStates(object):
     openocd_need_run = False
     openocd_skip_connection = False
     threads_updated = False  # True if something called a get_threads() method
-    threads_are_stopped = None  # type: bool or None
+    threads_are_stopped = None  # type: bool
     # sets to False after the update processed (for example, stopEvent generated)
     error = False
     start_time = None  # type: str

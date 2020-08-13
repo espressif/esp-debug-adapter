@@ -1,12 +1,18 @@
-*.pyc
+# ide and env dirs
 /.idea
 /.venv
 /.vscode
-/venv
+/.venv
+
+
+# temp folders
 /temp*
-/*.ps1
-/.environment/
-/main.exe
+/tmp
+
+# test generated files
 /tests/temp_sc_tests/gdbinit
 TEST*.xml
+
+# files
+*.pyc
 *.log

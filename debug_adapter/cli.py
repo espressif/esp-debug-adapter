@@ -22,12 +22,13 @@
 #
 # SPDX-License-Identifier: MIT
 
+import os
+import sys
 import click
 from typing import Union
-
-from .debug_adapter import A2VSC_STARTED_STRING, DebugAdapter, DaArgs
+from .debug_adapter import A2VSC_STARTED_STRING, DebugAdapter
 from .da_args import h, DaArgsDescriptor as DAD
-from .tools import *
+from .tools import ObjFromDict, WIN32
 
 
 def load_dev_defaults(in_args):
@@ -85,11 +86,15 @@ def connection_check_mode(in_args):
 # TODO xtensaEsp32Path -> xtensaEspToolchainPath, espToolchainPath
 @click.command()
 # Basic parameters:
-@click.option(DAD.app_flash_off.cli_long_key, DAD.app_flash_off.cli_short_key, show_default=True,
+@click.option(DAD.app_flash_off.cli_long_key,
+              DAD.app_flash_off.cli_short_key,
+              show_default=True,
               help=DAD.app_flash_off.help_str,
               default=DAD.app_flash_off.default_value,
               type=DAD.app_flash_off.implied_type)
-@click.option(DAD.board_type.cli_long_key, DAD.board_type.cli_short_key, show_default=True,
+@click.option(DAD.board_type.cli_long_key,
+              DAD.board_type.cli_short_key,
+              show_default=True,
               help=DAD.board_type.help_str,
               default=DAD.board_type.default_value,
               type=DAD.board_type.implied_type)  # TODO: move others to DaArgsDescriptor
@@ -108,25 +113,29 @@ def connection_check_mode(in_args):
 @click.option('--log-mult-files', '-lm', help=h['--log-mult-files'], default=None, is_flag=True)
 #
 # GDB parameters:
-@click.option('--toolchain-prefix', '-t', help=h['--toolchain-prefix'], type=Union[str], default=None,
+@click.option('--toolchain-prefix',
+              '-t',
+              help=h['--toolchain-prefix'],
+              type=Union[str],
+              default=None,
               show_default=True)
 @click.option('--elfpath', '-e', help=h['--elfpath'], default=None, type=Union[str])
 #
 # OpenOCD parameters:
 @click.option('--oocd', '-o', help=h['--oocd'], default=os.environ.get("OPENOCD_BIN", "openocd"), show_default=True)
 @click.option('--oocd-args', '-oa', help=h['--oocd-args'], default=None, show_default=True)
-@click.option('--oocd-mode', '-om', help=h['--oocd-mode'],
+@click.option('--oocd-mode',
+              '-om',
+              help=h['--oocd-mode'],
               type=click.Choice(('run_and_connect', 'connect_to_instance', 'without_oocd')),
               default="connect_to_instance",
               show_default=True)
 @click.option('--oocd-ip', '-ip', help=h['--oocd-ip'], default='localhost', show_default=True, type=Union[str])
-@click.option('--oocd-scripts', '-s', help=h['--oocd-scripts'], default=None,
-              show_default=True)
+@click.option('--oocd-scripts', '-s', help=h['--oocd-scripts'], default=None, show_default=True)
 #
 @click.pass_context
-def cli(ctx,
-        app_flash_off, board_type, conn_check, debug, device_name, dev_dbg, dev_x86rq, dev_defaults,
-        elfpath, log_file, log_mult_files, oocd, oocd_args, oocd_mode, oocd_ip, port, oocd_scripts, toolchain_prefix):
+def cli(ctx, app_flash_off, board_type, conn_check, debug, device_name, dev_dbg, dev_x86rq, dev_defaults, elfpath,
+        log_file, log_mult_files, oocd, oocd_args, oocd_mode, oocd_ip, port, oocd_scripts, toolchain_prefix):
     args_main = ObjFromDict(ctx.params)
     # Modificators
     if args_main.dev_defaults is not None:

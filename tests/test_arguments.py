@@ -1,6 +1,5 @@
 import unittest
 import debug_adapter
-import time
 
 
 class ArgumentsTest(unittest.TestCase):
@@ -13,7 +12,7 @@ class ArgumentsTest(unittest.TestCase):
 
     def da_start_stop(self, da_args):
         try:
-            da = debug_adapter.DebugAdapter(da_args)
+            debug_adapter.DebugAdapter(da_args)
         except Exception as e:
             raise self.failureException(e)
 

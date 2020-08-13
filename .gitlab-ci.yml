@@ -1,5 +1,6 @@
 stages:
-  - requests_testing
+  - checks
+  - tests
 
 cache:
   paths:
@@ -10,19 +11,31 @@ variables:
     CI_DEBUG_TRACE: "true"
 
 before_script:
-    - export PYTHONPATH="$CI_PROJECT_DIR:$CI_PROJECT_DIR/tests"
-    - echo $PYTHONPATH
-    - export PATH="$CI_PROJECT_DIR:$PATH"
-    - echo $PATH
+    - export LC_ALL=C.UTF-8
+    - export LANG=C.UTF-8
 
-test_usingx86_target:
-  image: $CI_DOCKER_REGISTRY/ubuntu-vscode:1-d2303206
-  stage: requests_testing
+check_python_style:
+  stage: checks
+  image: $CI_DOCKER_REGISTRY/esp32-ci-env
+  artifacts:
+    when: on_failure
+    paths:
+      - flake8_output.txt
+    expire_in: 1 week
+  before_script:
+    - python3 -m pip install flake8
+  script:
+    - python3 -m flake8 --config=.flake8 --output-file=flake8_output.txt --tee
+
+
+tests_unit:
+  image: $CI_DOCKER_REGISTRY/esp32-ci-env
+  stage: tests
   tags:
     - gdb_amd64_test
   artifacts:
     paths:
-    - /*debug.log
+    - /tests/*.log
     - tests/results/*
     reports:
       junit:
@@ -30,7 +43,6 @@ test_usingx86_target:
     when: always
     expire_in: 1 week
   script:
-
     - python3 -m pip install -r requirements.txt
     - cd $CI_PROJECT_DIR/tests
-    # - python3 ./run_tests.py
+    - python3 ./run_tests.py

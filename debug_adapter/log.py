@@ -42,11 +42,7 @@ level = DEBUG
 args = None
 start_time = None  # type: Any[str, None]
 _top_logger = None  # type: Any[Logger, None]
-argval2loglevel = {0: CRITICAL,
-                   1: ERROR,
-                   2: WARNING,
-                   3: INFO,
-                   4: DEBUG}
+argval2loglevel = {0: CRITICAL, 1: ERROR, 2: WARNING, 3: INFO, 4: DEBUG}
 
 
 def init(in_args, start_time_str='', add_to_file_name='', backup_old_log=BACKUP_OLD_LOG):
@@ -208,10 +204,11 @@ def debug_exception(msg=None):
     else:
         _top_logger.exception(msg)
 
+
 level = DEBUG
 formatter = Formatter(LOG_FORMAT)
 stream_handler = StreamHandler(sys.stdout)
 stream_handler.setFormatter(formatter)
 _top_logger = new_logger(log_name='early Debug Adapter (main)',
-                        stream_handler_=stream_handler,
-                        file_handler_=file_handler)
+                         stream_handler_=stream_handler,
+                         file_handler_=file_handler)

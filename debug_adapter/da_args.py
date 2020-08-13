@@ -24,30 +24,30 @@
 
 from typing import Union
 
-h = {  # @formatter:off
-    "--app_flash_off":      'Program start address offset (ESP32_APP_FLASH_OFF)',
-    "--board-type":         'Type of the board to run tests on (you could use OOCD_TEST_BOARD envvar by default)',
-    "--debug":              'Debug level (0-4), 5 - for a full OOCD log',
-    "--device-name":        'The name of used hardware to debug (currently Esp32 or Esp32_S2). It defines '
-                            '--toolchain-prefix',
-    "--port":               "Listen on given port for VS Code connections",
-    "--conn-check":         'Mode for development purposes',
-    "--dev-dbg":            'Mode for development purposes',
-    "--dev-x86rq":          'Mode for development purposes',
-    "--dev-defaults":       'Mode for development purposes',
-    "--log-file":           'Path to log file.',
-    "--log-mult-files":     'Log to separated files',
-    "--toolchain-prefix":   '(If not set, drives by --device-name!) Toolchain prefix. If set, rewrites the value '
-                            'specified by --device-name.',
-    "--elfpath":            'A path to a builder elf file for debugging.',
-    "--oocd":               'Path to OpenOCD binary file, (used OPENOCD_BIN envvar or (if not set) '
-                            '\'openocd\' by default)',
-    "--oocd-args":          "(If not set, drives by --device-name!) Specifies custom OpenOCD args. If set, rewrites the"
-                            " value specified by --device-name.",
-    "--oocd-mode":          'Cooperation with OpenOCD',
-    "--oocd-ip":            "Ip for remote OpenOCD connection",
-    "--oocd-scripts":       'Path to OpenOCD TCL scripts (use OPENOCD_SCRIPTS envvar by default)',
-}  # @formatter:on
+h = {
+    "--app_flash_off": 'Program start address offset (ESP32_APP_FLASH_OFF)',
+    "--board-type": 'Type of the board to run tests on (you could use OOCD_TEST_BOARD envvar by default)',
+    "--debug": 'Debug level (0-4), 5 - for a full OOCD log',
+    "--device-name": 'The name of used hardware to debug (currently Esp32 or Esp32_S2). It defines '
+    '--toolchain-prefix',
+    "--port": "Listen on given port for VS Code connections",
+    "--conn-check": 'Mode for development purposes',
+    "--dev-dbg": 'Mode for development purposes',
+    "--dev-x86rq": 'Mode for development purposes',
+    "--dev-defaults": 'Mode for development purposes',
+    "--log-file": 'Path to log file.',
+    "--log-mult-files": 'Log to separated files',
+    "--toolchain-prefix": '(If not set, drives by --device-name!) Toolchain prefix. If set, rewrites the value '
+    'specified by --device-name.',
+    "--elfpath": 'A path to a builder elf file for debugging.',
+    "--oocd": 'Path to OpenOCD binary file, (used OPENOCD_BIN envvar or (if not set) '
+    '\'openocd\' by default)',
+    "--oocd-args": "(If not set, drives by --device-name!) Specifies custom OpenOCD args. If set, rewrites the"
+    " value specified by --device-name.",
+    "--oocd-mode": 'Cooperation with OpenOCD',
+    "--oocd-ip": "Ip for remote OpenOCD connection",
+    "--oocd-scripts": 'Path to OpenOCD TCL scripts (use OPENOCD_SCRIPTS envvar by default)',
+}
 
 
 class DaArg(object):
@@ -57,8 +57,7 @@ class DaArg(object):
                  cli_short_key="-l",
                  help_str="The Help field wasn't written yet",
                  implied_type=str,
-                 default_value=None
-                 ):
+                 default_value=None):
         """
 
         Parameters
@@ -96,12 +95,12 @@ class DaArgsDescriptor(object):
                           default_value=0x10000,
                           implied_type=Union[int])
 
-    board_type =    DaArg(name="board_type",
-                          cli_long_key="--board-type",
-                          cli_short_key="-b",
-                          help_str=h["--app_flash_off"],
-                          default_value=None,
-                          implied_type=None)
+    board_type = DaArg(name="board_type",
+                       cli_long_key="--board-type",
+                       cli_short_key="-b",
+                       help_str=h["--app_flash_off"],
+                       default_value=None,
+                       implied_type=None)
 
     # @formatter:on
 
@@ -110,10 +109,25 @@ class DaArgs(object):
     """
     Contains mandatory set of Da arguments. Can be extended with **kwargs
     """
-
-    def __init__(self, app_flash_off=None, board_type="", conn_check=False, debug=2, device_name="", dev_dbg=False,
-                 dev_x86rq=False, dev_defaults=False, elfpath="", log_file=None, log_mult_files=False, oocd="",
-                 oocd_args=None, oocd_mode="", oocd_ip="", port=43474, oocd_scripts="", toolchain_prefix="",
+    def __init__(self,
+                 app_flash_off=None,
+                 board_type="",
+                 conn_check=False,
+                 debug=2,
+                 device_name="",
+                 dev_dbg=False,
+                 dev_x86rq=False,
+                 dev_defaults=False,
+                 elfpath="",
+                 log_file=None,
+                 log_mult_files=False,
+                 oocd="",
+                 oocd_args=None,
+                 oocd_mode="",
+                 oocd_ip="",
+                 port=43474,
+                 oocd_scripts="",
+                 toolchain_prefix="",
                  **kwargs):
         """
 
