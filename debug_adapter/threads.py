@@ -37,7 +37,7 @@ else:
 class ReaderThread(threading.Thread):
     def __init__(self, stream, process_command):
         self._stop = False
-        self._logger = log.new_logger("Debug Adapter (ReaderThread)")
+        self._logger = log.new_logger("Debug Adapter (ReaderThread)", with_console_output=False)
         self.stream = stream  # stream to read
         self.process_command = process_command
         threading.Thread.__init__(self, name="ReaderThread")
@@ -53,7 +53,7 @@ class ReaderThread(threading.Thread):
         except Exception as e:
             if e == SystemExit:
                 return
-            log.debug_exception(e)
+            log.debug_exception_no_con(e)
 
     def read(self):
         """
@@ -90,7 +90,7 @@ class ReaderThread(threading.Thread):
 class WriterThread(threading.Thread):
     def __init__(self, stream, queue):
         self._stop = False
-        self._logger = log.new_logger("Debug Adapter (WriterThread)")
+        self._logger = log.new_logger("Debug Adapter (WriterThread)", with_console_output=False)
         self.stream = stream
         self.queue = queue
         threading.Thread.__init__(self, name="WriterThread")
@@ -106,11 +106,11 @@ class WriterThread(threading.Thread):
                     try:
                         to_write = to_json()
                     except Exception as e:
-                        log.debug_exception(e)
-                        log.debug_exception('Error serializing %s to json.' % (to_write, ))
+                        log.debug_exception_no_con(e)
+                        log.debug_exception_no_con('Error serializing %s to json.' % (to_write,))
                         continue
 
-                self._logger.debug('Writing: %s\n' % (to_write, ))
+                self._logger.debug_no_con('Writing: %s\n' % (to_write,))
 
                 if to_write.__class__ == bytes:
                     as_bytes = to_write
@@ -121,4 +121,4 @@ class WriterThread(threading.Thread):
                 self.stream.write(as_bytes)
                 self.stream.flush()
         except Exception as e:
-            log.debug_exception(e)
+            log.debug_exception_no_con(e)

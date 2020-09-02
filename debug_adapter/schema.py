@@ -13,7 +13,7 @@ class ProtocolMessage(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -32,7 +32,7 @@ class ProtocolMessage(BaseSchema):
     def __init__(self, type, seq=-1, **kwargs):
         """
         :param string type: Message type.
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = type
         self.seq = seq
@@ -51,7 +51,7 @@ class ProtocolMessage(BaseSchema):
 @register
 class Request(BaseSchema):
     """
-    A client or server-initiated request.
+    A client or debug adapter initiated request.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -59,7 +59,7 @@ class Request(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -92,7 +92,7 @@ class Request(BaseSchema):
         """
         :param string type: 
         :param string command: The command to execute.
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] arguments: Object containing arguments for the command.
         """
         self.type = 'request'
@@ -117,7 +117,7 @@ class Request(BaseSchema):
 @register
 class Event(BaseSchema):
     """
-    Server-initiated event.
+    A debug adapter initiated event.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -125,7 +125,7 @@ class Event(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -158,7 +158,7 @@ class Event(BaseSchema):
         """
         :param string type: 
         :param string event: Type of event.
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Event-specific information.
         """
         self.type = 'event'
@@ -183,7 +183,7 @@ class Event(BaseSchema):
 @register
 class Response(BaseSchema):
     """
-    Response to a request.
+    Response for a request.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -191,7 +191,7 @@ class Response(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -205,7 +205,7 @@ class Response(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -213,7 +213,13 @@ class Response(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -237,9 +243,344 @@ class Response(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
+        :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
+        """
+        self.type = 'response'
+        self.request_seq = request_seq
+        self.success = success
+        self.command = command
+        self.seq = seq
+        self.message = message
+        self.body = body
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'request_seq': self.request_seq,
+             'success': self.success,
+             'command': self.command,
+             'seq': self.seq,
+        }
+        if self.message is not None:
+            dct['message'] = self.message
+        if self.body is not None:
+            dct['body'] = self.body
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_response('error')
+@register
+class ErrorResponse(BaseSchema):
+    """
+    On error (whenever 'success' is false), the body can provide more details.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "response"
+            ]
+        },
+        "request_seq": {
+            "type": "integer",
+            "description": "Sequence number of the corresponding request."
+        },
+        "success": {
+            "type": "boolean",
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
+        },
+        "command": {
+            "type": "string",
+            "description": "The command requested."
+        },
+        "message": {
+            "type": "string",
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
+        },
+        "body": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/Message",
+                    "description": "An optional, structured error message."
+                }
+            }
+        }
+    }
+    __refs__ = {'body'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, request_seq, success, command, body, seq=-1, message=None, **kwargs):
+        """
+        :param string type: 
+        :param integer request_seq: Sequence number of the corresponding request.
+        :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
+        :param string command: The command requested.
+        :param ErrorResponseBody body: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
+        """
+        self.type = 'response'
+        self.request_seq = request_seq
+        self.success = success
+        self.command = command
+        if body is None:
+            self.body = ErrorResponseBody()
+        else:
+            self.body = ErrorResponseBody(**body) if body.__class__ !=  ErrorResponseBody else body
+        self.seq = seq
+        self.message = message
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'request_seq': self.request_seq,
+             'success': self.success,
+             'command': self.command,
+             'body': self.body.to_dict(),
+             'seq': self.seq,
+        }
+        if self.message is not None:
+            dct['message'] = self.message
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_request('cancel')
+@register
+class CancelRequest(BaseSchema):
+    """
+    The 'cancel' request is used by the frontend in two situations:
+    
+    - to indicate that it is no longer interested in the result produced by a specific request issued
+    earlier
+    
+    - to cancel a progress sequence. Clients should only call this request if the capability
+    'supportsCancelRequest' is true.
+    
+    This request has a hint characteristic: a debug adapter can only be expected to make a 'best effort'
+    in honouring this request but there are no guarantees.
+    
+    The 'cancel' request may return an error if it could not cancel an operation but a frontend should
+    refrain from presenting this error to end users.
+    
+    A frontend client should only call this request if the capability 'supportsCancelRequest' is true.
+    
+    The request that got canceled still needs to send a response back. This can either be a normal
+    result ('success' attribute true)
+    
+    or an error response ('success' attribute false and the 'message' set to 'cancelled').
+    
+    Returning partial results from a cancelled request is possible but please note that a frontend
+    client has no generic way for detecting that a response is partial or not.
+    
+    The progress that got cancelled still needs to send a 'progressEnd' event back.
+    
+    A client should not assume that progress just got cancelled after sending the 'cancel' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "request"
+            ]
+        },
+        "command": {
+            "type": "string",
+            "enum": [
+                "cancel"
+            ]
+        },
+        "arguments": {
+            "type": "CancelArguments"
+        }
+    }
+    __refs__ = {'arguments'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, seq=-1, arguments=None, **kwargs):
+        """
+        :param string type: 
+        :param string command: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param CancelArguments arguments: 
+        """
+        self.type = 'request'
+        self.command = 'cancel'
+        self.seq = seq
+        if arguments is None:
+            self.arguments = CancelArguments()
+        else:
+            self.arguments = CancelArguments(**arguments) if arguments.__class__ !=  CancelArguments else arguments
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'command': self.command,
+             'seq': self.seq,
+        }
+        if self.arguments is not None:
+            dct['arguments'] = self.arguments.to_dict()
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class CancelArguments(BaseSchema):
+    """
+    Arguments for 'cancel' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "requestId": {
+            "type": "integer",
+            "description": "The ID (attribute 'seq') of the request to cancel. If missing no request is cancelled.\nBoth a 'requestId' and a 'progressId' can be specified in one request."
+        },
+        "progressId": {
+            "type": "string",
+            "description": "The ID (attribute 'progressId') of the progress to cancel. If missing no progress is cancelled.\nBoth a 'requestId' and a 'progressId' can be specified in one request."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, requestId=None, progressId=None, **kwargs):
+        """
+        :param integer requestId: The ID (attribute 'seq') of the request to cancel. If missing no request is cancelled.
+        Both a 'requestId' and a 'progressId' can be specified in one request.
+        :param string progressId: The ID (attribute 'progressId') of the progress to cancel. If missing no progress is cancelled.
+        Both a 'requestId' and a 'progressId' can be specified in one request.
+        """
+        self.requestId = requestId
+        self.progressId = progressId
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+        }
+        if self.requestId is not None:
+            dct['requestId'] = self.requestId
+        if self.progressId is not None:
+            dct['progressId'] = self.progressId
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_response('cancel')
+@register
+class CancelResponse(BaseSchema):
+    """
+    Response to 'cancel' request. This is just an acknowledgement, so no body field is required.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "response"
+            ]
+        },
+        "request_seq": {
+            "type": "integer",
+            "description": "Sequence number of the corresponding request."
+        },
+        "success": {
+            "type": "boolean",
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
+        },
+        "command": {
+            "type": "string",
+            "description": "The command requested."
+        },
+        "message": {
+            "type": "string",
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
+        },
+        "body": {
+            "type": [
+                "array",
+                "boolean",
+                "integer",
+                "null",
+                "number",
+                "object",
+                "string"
+            ],
+            "description": "Contains request result if success is true and optional error details if success is false."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, request_seq, success, command, seq=-1, message=None, body=None, **kwargs):
+        """
+        :param string type: 
+        :param integer request_seq: Sequence number of the corresponding request.
+        :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
+        :param string command: The command requested.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -271,28 +612,27 @@ class Response(BaseSchema):
 @register
 class InitializedEvent(BaseSchema):
     """
-    Event message for 'initialized' event type.
-    
     This event indicates that the debug adapter is ready to accept configuration requests (e.g.
     SetBreakpointsRequest, SetExceptionBreakpointsRequest).
     
     A debug adapter is expected to send this event when it is ready to accept configuration requests
-    (but not before the InitializeRequest has finished).
+    (but not before the 'initialize' request has finished).
     
     The sequence of events/requests is as follows:
     
-    - adapters sends InitializedEvent (after the InitializeRequest has returned)
+    - adapters sends 'initialized' event (after the 'initialize' request has returned)
     
-    - frontend sends zero or more SetBreakpointsRequest
+    - frontend sends zero or more 'setBreakpoints' requests
     
-    - frontend sends one SetFunctionBreakpointsRequest
+    - frontend sends one 'setFunctionBreakpoints' request (if capability 'supportsFunctionBreakpoints'
+    is true)
     
-    - frontend sends a SetExceptionBreakpointsRequest if one or more exceptionBreakpointFilters have
-    been defined (or if supportsConfigurationDoneRequest is not defined or false)
+    - frontend sends a 'setExceptionBreakpoints' request if one or more 'exceptionBreakpointFilters'
+    have been defined (or if 'supportsConfigurationDoneRequest' is not defined or false)
     
     - frontend sends other future configuration requests
     
-    - frontend sends one ConfigurationDoneRequest to indicate the end of the configuration
+    - frontend sends one 'configurationDone' request to indicate the end of the configuration.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -300,7 +640,7 @@ class InitializedEvent(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -335,7 +675,7 @@ class InitializedEvent(BaseSchema):
         """
         :param string type: 
         :param string event: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Event-specific information.
         """
         self.type = 'event'
@@ -360,11 +700,9 @@ class InitializedEvent(BaseSchema):
 @register
 class StoppedEvent(BaseSchema):
     """
-    Event message for 'stopped' event type.
-    
     The event indicates that the execution of the debuggee has stopped due to some condition.
     
-    This can be caused by a break point previously set, a stepping action has completed, by executing a
+    This can be caused by a break point previously set, a stepping request has completed, by executing a
     debugger statement etc.
 
     Note: automatically generated code. Do not edit manually.
@@ -373,7 +711,7 @@ class StoppedEvent(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -398,12 +736,16 @@ class StoppedEvent(BaseSchema):
                         "breakpoint",
                         "exception",
                         "pause",
-                        "entry"
+                        "entry",
+                        "goto",
+                        "function breakpoint",
+                        "data breakpoint",
+                        "instruction breakpoint"
                     ]
                 },
                 "description": {
                     "type": "string",
-                    "description": "The full reason for the event, e.g. 'Paused on exception'. This string is shown in the UI as is."
+                    "description": "The full reason for the event, e.g. 'Paused on exception'. This string is shown in the UI as is and must be translated."
                 },
                 "threadId": {
                     "type": "integer",
@@ -419,7 +761,7 @@ class StoppedEvent(BaseSchema):
                 },
                 "allThreadsStopped": {
                     "type": "boolean",
-                    "description": "If allThreadsStopped is true, a debug adapter can announce that all threads have stopped.\n*  The client should use this information to enable that all threads can be expanded to access their stacktraces.\n*  If the attribute is missing or false, only the thread with the given threadId can be expanded."
+                    "description": "If 'allThreadsStopped' is true, a debug adapter can announce that all threads have stopped.\n- The client should use this information to enable that all threads can be expanded to access their stacktraces.\n- If the attribute is missing or false, only the thread with the given threadId can be expanded."
                 }
             },
             "required": [
@@ -436,7 +778,7 @@ class StoppedEvent(BaseSchema):
         :param string type: 
         :param string event: 
         :param StoppedEventBody body: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'event'
         self.event = 'stopped'
@@ -462,14 +804,12 @@ class StoppedEvent(BaseSchema):
 @register
 class ContinuedEvent(BaseSchema):
     """
-    Event message for 'continued' event type.
-    
     The event indicates that the execution of the debuggee has continued.
     
     Please note: a debug adapter is not expected to send this event in response to a request that
     implies that execution continues, e.g. 'launch' or 'continue'.
     
-    It is only necessary to send a ContinuedEvent if there was no previous request that implied this.
+    It is only necessary to send a 'continued' event if there was no previous request that implied this.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -477,7 +817,7 @@ class ContinuedEvent(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -500,7 +840,7 @@ class ContinuedEvent(BaseSchema):
                 },
                 "allThreadsContinued": {
                     "type": "boolean",
-                    "description": "If allThreadsContinued is true, a debug adapter can announce that all threads have continued."
+                    "description": "If 'allThreadsContinued' is true, a debug adapter can announce that all threads have continued."
                 }
             },
             "required": [
@@ -517,7 +857,7 @@ class ContinuedEvent(BaseSchema):
         :param string type: 
         :param string event: 
         :param ContinuedEventBody body: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'event'
         self.event = 'continued'
@@ -543,9 +883,7 @@ class ContinuedEvent(BaseSchema):
 @register
 class ExitedEvent(BaseSchema):
     """
-    Event message for 'exited' event type.
-    
-    The event indicates that the debuggee has exited.
+    The event indicates that the debuggee has exited and returns its exit code.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -553,7 +891,7 @@ class ExitedEvent(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -589,7 +927,7 @@ class ExitedEvent(BaseSchema):
         :param string type: 
         :param string event: 
         :param ExitedEventBody body: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'event'
         self.event = 'exited'
@@ -615,9 +953,8 @@ class ExitedEvent(BaseSchema):
 @register
 class TerminatedEvent(BaseSchema):
     """
-    Event message for 'terminated' event types.
-    
-    The event indicates that debugging of the debuggee has terminated.
+    The event indicates that debugging of the debuggee has terminated. This does **not** mean that the
+    debuggee itself has exited.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -625,7 +962,7 @@ class TerminatedEvent(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -665,7 +1002,7 @@ class TerminatedEvent(BaseSchema):
         """
         :param string type: 
         :param string event: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         :param TerminatedEventBody body: 
         """
         self.type = 'event'
@@ -693,8 +1030,6 @@ class TerminatedEvent(BaseSchema):
 @register
 class ThreadEvent(BaseSchema):
     """
-    Event message for 'thread' event type.
-    
     The event indicates that a thread has started or exited.
 
     Note: automatically generated code. Do not edit manually.
@@ -703,7 +1038,7 @@ class ThreadEvent(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -748,7 +1083,7 @@ class ThreadEvent(BaseSchema):
         :param string type: 
         :param string event: 
         :param ThreadEventBody body: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'event'
         self.event = 'thread'
@@ -774,8 +1109,6 @@ class ThreadEvent(BaseSchema):
 @register
 class OutputEvent(BaseSchema):
     """
-    Event message for 'output' event type.
-    
     The event indicates that the target has produced some output.
 
     Note: automatically generated code. Do not edit manually.
@@ -784,7 +1117,7 @@ class OutputEvent(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -815,9 +1148,23 @@ class OutputEvent(BaseSchema):
                     "type": "string",
                     "description": "The output to report."
                 },
+                "group": {
+                    "type": "string",
+                    "description": "Support for keeping an output log organized by grouping related messages.",
+                    "enum": [
+                        "start",
+                        "startCollapsed",
+                        "end"
+                    ],
+                    "enumDescriptions": [
+                        "Start a new group in expanded mode. Subsequent output events are members of the group and should be shown indented.\nThe 'output' attribute becomes the name of the group and is not indented.",
+                        "Start a new group in collapsed mode. Subsequent output events are members of the group and should be shown indented (as soon as the group is expanded).\nThe 'output' attribute becomes the name of the group and is not indented.",
+                        "End the current group and decreases the indentation of subsequent output events.\nA non empty 'output' attribute is shown as the unindented end of the group."
+                    ]
+                },
                 "variablesReference": {
-                    "type": "number",
-                    "description": "If an attribute 'variablesReference' exists and its value is > 0, the output contains objects which can be retrieved by passing variablesReference to the VariablesRequest."
+                    "type": "integer",
+                    "description": "If an attribute 'variablesReference' exists and its value is > 0, the output contains objects which can be retrieved by passing 'variablesReference' to the 'variables' request. The value should be less than or equal to 2147483647 (2^31 - 1)."
                 },
                 "source": {
                     "$ref": "#/definitions/Source",
@@ -858,7 +1205,7 @@ class OutputEvent(BaseSchema):
         :param string type: 
         :param string event: 
         :param OutputEventBody body: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'event'
         self.event = 'output'
@@ -884,8 +1231,6 @@ class OutputEvent(BaseSchema):
 @register
 class BreakpointEvent(BaseSchema):
     """
-    Event message for 'breakpoint' event type.
-    
     The event indicates that some information about a breakpoint has changed.
 
     Note: automatically generated code. Do not edit manually.
@@ -894,7 +1239,7 @@ class BreakpointEvent(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -922,7 +1267,7 @@ class BreakpointEvent(BaseSchema):
                 },
                 "breakpoint": {
                     "$ref": "#/definitions/Breakpoint",
-                    "description": "The breakpoint."
+                    "description": "The 'id' attribute is used to find the target breakpoint and the other attributes are used as the new values."
                 }
             },
             "required": [
@@ -940,7 +1285,7 @@ class BreakpointEvent(BaseSchema):
         :param string type: 
         :param string event: 
         :param BreakpointEventBody body: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'event'
         self.event = 'breakpoint'
@@ -966,8 +1311,6 @@ class BreakpointEvent(BaseSchema):
 @register
 class ModuleEvent(BaseSchema):
     """
-    Event message for 'module' event type.
-    
     The event indicates that some information about a module has changed.
 
     Note: automatically generated code. Do not edit manually.
@@ -976,7 +1319,7 @@ class ModuleEvent(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -1022,7 +1365,7 @@ class ModuleEvent(BaseSchema):
         :param string type: 
         :param string event: 
         :param ModuleEventBody body: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'event'
         self.event = 'module'
@@ -1048,8 +1391,6 @@ class ModuleEvent(BaseSchema):
 @register
 class LoadedSourceEvent(BaseSchema):
     """
-    Event message for 'loadedSource' event type.
-    
     The event indicates that some source has been added, changed, or removed from the set of all loaded
     sources.
 
@@ -1059,7 +1400,7 @@ class LoadedSourceEvent(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -1105,7 +1446,7 @@ class LoadedSourceEvent(BaseSchema):
         :param string type: 
         :param string event: 
         :param LoadedSourceEventBody body: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'event'
         self.event = 'loadedSource'
@@ -1131,8 +1472,6 @@ class LoadedSourceEvent(BaseSchema):
 @register
 class ProcessEvent(BaseSchema):
     """
-    Event message for 'process' event type.
-    
     The event indicates that the debugger has begun debugging a new process. Either one that it has
     launched, or one that it has attached to.
 
@@ -1142,7 +1481,7 @@ class ProcessEvent(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -1184,6 +1523,10 @@ class ProcessEvent(BaseSchema):
                         "Debugger attached to an existing process.",
                         "A project launcher component has launched a new process in a suspended state and then asked the debugger to attach."
                     ]
+                },
+                "pointerSize": {
+                    "type": "integer",
+                    "description": "The size of a pointer or address for this process, in bits. This value may be used by clients when formatting addresses for display."
                 }
             },
             "required": [
@@ -1200,7 +1543,7 @@ class ProcessEvent(BaseSchema):
         :param string type: 
         :param string event: 
         :param ProcessEventBody body: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'event'
         self.event = 'process'
@@ -1226,8 +1569,6 @@ class ProcessEvent(BaseSchema):
 @register
 class CapabilitiesEvent(BaseSchema):
     """
-    Event message for 'capabilities' event type.
-    
     The event indicates that one or more capabilities have changed.
     
     Since the capabilities are dependent on the frontend and its UI, it might not be possible to change
@@ -1244,7 +1585,7 @@ class CapabilitiesEvent(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -1280,7 +1621,7 @@ class CapabilitiesEvent(BaseSchema):
         :param string type: 
         :param string event: 
         :param CapabilitiesEventBody body: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'event'
         self.event = 'capabilities'
@@ -1303,13 +1644,18 @@ class CapabilitiesEvent(BaseSchema):
         return dct
 
 
-@register_request('runInTerminal')
 @register
-class RunInTerminalRequest(BaseSchema):
+class ProgressStartEvent(BaseSchema):
     """
-    runInTerminal request; value of command field is 'runInTerminal'.
+    The event signals that a long running operation is about to start and
     
-    With this request a debug adapter can run a command in a terminal.
+    provides additional information for the client to set up a corresponding progress and cancellation
+    UI.
+    
+    The client is free to delay the showing of the UI in order to reduce flicker.
+    
+    This event should only be sent if the client has passed the value true for the
+    'supportsProgressReporting' capability of the 'initialize' request.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -1317,7 +1663,265 @@ class RunInTerminalRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "event"
+            ]
+        },
+        "event": {
+            "type": "string",
+            "enum": [
+                "progressStart"
+            ]
+        },
+        "body": {
+            "type": "object",
+            "properties": {
+                "progressId": {
+                    "type": "string",
+                    "description": "An ID that must be used in subsequent 'progressUpdate' and 'progressEnd' events to make them refer to the same progress reporting.\nIDs must be unique within a debug session."
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Mandatory (short) title of the progress reporting. Shown in the UI to describe the long running operation."
+                },
+                "requestId": {
+                    "type": "number",
+                    "description": "The request ID that this progress report is related to. If specified a debug adapter is expected to emit\nprogress events for the long running request until the request has been either completed or cancelled.\nIf the request ID is omitted, the progress report is assumed to be related to some general activity of the debug adapter."
+                },
+                "cancellable": {
+                    "type": "boolean",
+                    "description": "If true, the request that reports progress may be canceled with a 'cancel' request.\nSo this property basically controls whether the client should use UX that supports cancellation.\nClients that don't support cancellation are allowed to ignore the setting."
+                },
+                "message": {
+                    "type": "string",
+                    "description": "Optional, more detailed progress message."
+                },
+                "percentage": {
+                    "type": "number",
+                    "description": "Optional progress percentage to display (value range: 0 to 100). If omitted no percentage will be shown."
+                }
+            },
+            "required": [
+                "progressId",
+                "title"
+            ]
+        }
+    }
+    __refs__ = {'body'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, body, seq=-1, **kwargs):
+        """
+        :param string type: 
+        :param string event: 
+        :param ProgressStartEventBody body: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        """
+        self.type = 'event'
+        self.event = 'progressStart'
+        if body is None:
+            self.body = ProgressStartEventBody()
+        else:
+            self.body = ProgressStartEventBody(**body) if body.__class__ !=  ProgressStartEventBody else body
+        self.seq = seq
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'event': self.event,
+             'body': self.body.to_dict(),
+             'seq': self.seq,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class ProgressUpdateEvent(BaseSchema):
+    """
+    The event signals that the progress reporting needs to updated with a new message and/or percentage.
+    
+    The client does not have to update the UI immediately, but the clients needs to keep track of the
+    message and/or percentage values.
+    
+    This event should only be sent if the client has passed the value true for the
+    'supportsProgressReporting' capability of the 'initialize' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "event"
+            ]
+        },
+        "event": {
+            "type": "string",
+            "enum": [
+                "progressUpdate"
+            ]
+        },
+        "body": {
+            "type": "object",
+            "properties": {
+                "progressId": {
+                    "type": "string",
+                    "description": "The ID that was introduced in the initial 'progressStart' event."
+                },
+                "message": {
+                    "type": "string",
+                    "description": "Optional, more detailed progress message. If omitted, the previous message (if any) is used."
+                },
+                "percentage": {
+                    "type": "number",
+                    "description": "Optional progress percentage to display (value range: 0 to 100). If omitted no percentage will be shown."
+                }
+            },
+            "required": [
+                "progressId"
+            ]
+        }
+    }
+    __refs__ = {'body'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, body, seq=-1, **kwargs):
+        """
+        :param string type: 
+        :param string event: 
+        :param ProgressUpdateEventBody body: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        """
+        self.type = 'event'
+        self.event = 'progressUpdate'
+        if body is None:
+            self.body = ProgressUpdateEventBody()
+        else:
+            self.body = ProgressUpdateEventBody(**body) if body.__class__ !=  ProgressUpdateEventBody else body
+        self.seq = seq
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'event': self.event,
+             'body': self.body.to_dict(),
+             'seq': self.seq,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class ProgressEndEvent(BaseSchema):
+    """
+    The event signals the end of the progress reporting with an optional final message.
+    
+    This event should only be sent if the client has passed the value true for the
+    'supportsProgressReporting' capability of the 'initialize' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "event"
+            ]
+        },
+        "event": {
+            "type": "string",
+            "enum": [
+                "progressEnd"
+            ]
+        },
+        "body": {
+            "type": "object",
+            "properties": {
+                "progressId": {
+                    "type": "string",
+                    "description": "The ID that was introduced in the initial 'ProgressStartEvent'."
+                },
+                "message": {
+                    "type": "string",
+                    "description": "Optional, more detailed progress message. If omitted, the previous message (if any) is used."
+                }
+            },
+            "required": [
+                "progressId"
+            ]
+        }
+    }
+    __refs__ = {'body'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, body, seq=-1, **kwargs):
+        """
+        :param string type: 
+        :param string event: 
+        :param ProgressEndEventBody body: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        """
+        self.type = 'event'
+        self.event = 'progressEnd'
+        if body is None:
+            self.body = ProgressEndEventBody()
+        else:
+            self.body = ProgressEndEventBody(**body) if body.__class__ !=  ProgressEndEventBody else body
+        self.seq = seq
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'event': self.event,
+             'body': self.body.to_dict(),
+             'seq': self.seq,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_request('runInTerminal')
+@register
+class RunInTerminalRequest(BaseSchema):
+    """
+    This optional request is sent from the debug adapter to the client to run a command in a terminal.
+    
+    This is typically used to launch the debuggee in a terminal provided by the client.
+    
+    This request should only be called if the client has passed the value true for the
+    'supportsRunInTerminalRequest' capability of the 'initialize' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -1344,7 +1948,7 @@ class RunInTerminalRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param RunInTerminalRequestArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'runInTerminal'
@@ -1453,7 +2057,7 @@ class RunInTerminalRequestArguments(BaseSchema):
 @register
 class RunInTerminalResponse(BaseSchema):
     """
-    Response to Initialize request.
+    Response to 'runInTerminal' request.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -1461,7 +2065,7 @@ class RunInTerminalResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -1475,7 +2079,7 @@ class RunInTerminalResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -1483,103 +2087,24 @@ class RunInTerminalResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
             "properties": {
                 "processId": {
-                    "type": "number",
-                    "description": "The process ID."
-                }
-            }
-        }
-    }
-    __refs__ = {'body'}
-
-    __slots__ = list(__props__.keys()) + ['kwargs']
-
-    def __init__(self, request_seq, success, command, seq=-1, message=None, body=None, **kwargs):
-        """
-        :param string type: 
-        :param integer request_seq: Sequence number of the corresponding request.
-        :param boolean success: Outcome of the request.
-        :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
-        :param RunInTerminalResponseBody body: 
-        """
-        self.type = 'response'
-        self.request_seq = request_seq
-        self.success = success
-        self.command = command
-        self.seq = seq
-        self.message = message
-        if body is None:
-            self.body = RunInTerminalResponseBody()
-        else:
-            self.body = RunInTerminalResponseBody(**body) if body.__class__ !=  RunInTerminalResponseBody else body
-        self.kwargs = kwargs
-
-
-    def to_dict(self):
-        dct = {
-             'type': self.type,
-             'request_seq': self.request_seq,
-             'success': self.success,
-             'command': self.command,
-             'seq': self.seq,
-        }
-        if self.message is not None:
-            dct['message'] = self.message
-        if self.body is not None:
-            dct['body'] = self.body.to_dict()
-        dct.update(self.kwargs)
-        return dct
-
-
-@register_response('error')
-@register
-class ErrorResponse(BaseSchema):
-    """
-    On error that is whenever 'success' is false, the body can provide more details.
-
-    Note: automatically generated code. Do not edit manually.
-    """
-
-    __props__ = {
-        "seq": {
-            "type": "integer",
-            "description": "Sequence number."
-        },
-        "type": {
-            "type": "string",
-            "enum": [
-                "response"
-            ]
-        },
-        "request_seq": {
-            "type": "integer",
-            "description": "Sequence number of the corresponding request."
-        },
-        "success": {
-            "type": "boolean",
-            "description": "Outcome of the request."
-        },
-        "command": {
-            "type": "string",
-            "description": "The command requested."
-        },
-        "message": {
-            "type": "string",
-            "description": "Contains error message if success == false."
-        },
-        "body": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "$ref": "#/definitions/Message",
-                    "description": "An optional, structured error message."
+                    "type": "integer",
+                    "description": "The process ID. The value should be less than or equal to 2147483647 (2^31 - 1)."
+                },
+                "shellProcessId": {
+                    "type": "integer",
+                    "description": "The process ID of the terminal shell. The value should be less than or equal to 2147483647 (2^31 - 1)."
                 }
             }
         }
@@ -1593,19 +2118,23 @@ class ErrorResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param ErrorResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param RunInTerminalResponseBody body: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
         self.success = success
         self.command = command
         if body is None:
-            self.body = ErrorResponseBody()
+            self.body = RunInTerminalResponseBody()
         else:
-            self.body = ErrorResponseBody(**body) if body.__class__ !=  ErrorResponseBody else body
+            self.body = RunInTerminalResponseBody(**body) if body.__class__ !=  RunInTerminalResponseBody else body
         self.seq = seq
         self.message = message
         self.kwargs = kwargs
@@ -1630,7 +2159,18 @@ class ErrorResponse(BaseSchema):
 @register
 class InitializeRequest(BaseSchema):
     """
-    Initialize request; value of command field is 'initialize'.
+    The 'initialize' request is sent as the first request from the client to the debug adapter
+    
+    in order to configure it with client capabilities and to retrieve capabilities from the debug
+    adapter.
+    
+    Until the debug adapter has responded to with an 'initialize' response, the client must not send any
+    additional requests or events to the debug adapter.
+    
+    In addition the debug adapter is not allowed to send any requests or events to the client until it
+    has responded with an 'initialize' response.
+    
+    The 'initialize' request may only be sent once.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -1638,7 +2178,7 @@ class InitializeRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -1665,7 +2205,7 @@ class InitializeRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param InitializeRequestArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'initialize'
@@ -1740,13 +2280,21 @@ class InitializeRequestArguments(BaseSchema):
         "supportsRunInTerminalRequest": {
             "type": "boolean",
             "description": "Client supports the runInTerminal request."
+        },
+        "supportsMemoryReferences": {
+            "type": "boolean",
+            "description": "Client supports memory references."
+        },
+        "supportsProgressReporting": {
+            "type": "boolean",
+            "description": "Client supports progress reporting."
         }
     }
     __refs__ = set()
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, adapterID, clientID=None, clientName=None, locale=None, linesStartAt1=None, columnsStartAt1=None, pathFormat=None, supportsVariableType=None, supportsVariablePaging=None, supportsRunInTerminalRequest=None, **kwargs):
+    def __init__(self, adapterID, clientID=None, clientName=None, locale=None, linesStartAt1=None, columnsStartAt1=None, pathFormat=None, supportsVariableType=None, supportsVariablePaging=None, supportsRunInTerminalRequest=None, supportsMemoryReferences=None, supportsProgressReporting=None, **kwargs):
         """
         :param string adapterID: The ID of the debug adapter.
         :param string clientID: The ID of the (frontend) client using this adapter.
@@ -1758,6 +2306,8 @@ class InitializeRequestArguments(BaseSchema):
         :param boolean supportsVariableType: Client supports the optional type attribute for variables.
         :param boolean supportsVariablePaging: Client supports the paging of variables.
         :param boolean supportsRunInTerminalRequest: Client supports the runInTerminal request.
+        :param boolean supportsMemoryReferences: Client supports memory references.
+        :param boolean supportsProgressReporting: Client supports progress reporting.
         """
         self.adapterID = adapterID
         self.clientID = clientID
@@ -1769,6 +2319,8 @@ class InitializeRequestArguments(BaseSchema):
         self.supportsVariableType = supportsVariableType
         self.supportsVariablePaging = supportsVariablePaging
         self.supportsRunInTerminalRequest = supportsRunInTerminalRequest
+        self.supportsMemoryReferences = supportsMemoryReferences
+        self.supportsProgressReporting = supportsProgressReporting
         self.kwargs = kwargs
 
 
@@ -1794,6 +2346,10 @@ class InitializeRequestArguments(BaseSchema):
             dct['supportsVariablePaging'] = self.supportsVariablePaging
         if self.supportsRunInTerminalRequest is not None:
             dct['supportsRunInTerminalRequest'] = self.supportsRunInTerminalRequest
+        if self.supportsMemoryReferences is not None:
+            dct['supportsMemoryReferences'] = self.supportsMemoryReferences
+        if self.supportsProgressReporting is not None:
+            dct['supportsProgressReporting'] = self.supportsProgressReporting
         dct.update(self.kwargs)
         return dct
 
@@ -1810,7 +2366,7 @@ class InitializeResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -1824,7 +2380,7 @@ class InitializeResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -1832,7 +2388,13 @@ class InitializeResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "description": "The capabilities of this debug adapter.",
@@ -1848,9 +2410,13 @@ class InitializeResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param Capabilities body: The capabilities of this debug adapter.
         """
         self.type = 'response'
@@ -1886,10 +2452,12 @@ class InitializeResponse(BaseSchema):
 @register
 class ConfigurationDoneRequest(BaseSchema):
     """
-    ConfigurationDone request; value of command field is 'configurationDone'.
+    This optional request indicates that the client has finished initialization of the debug adapter.
     
-    The client of the debug protocol must send this request at the end of the sequence of configuration
-    requests (which was started by the InitializedEvent).
+    So it is the last request in the sequence of configuration requests (which was started by the
+    'initialized' event).
+    
+    Clients should only call this request if the capability 'supportsConfigurationDoneRequest' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -1897,7 +2465,7 @@ class ConfigurationDoneRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -1923,7 +2491,7 @@ class ConfigurationDoneRequest(BaseSchema):
         """
         :param string type: 
         :param string command: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         :param ConfigurationDoneArguments arguments: 
         """
         self.type = 'request'
@@ -1952,8 +2520,6 @@ class ConfigurationDoneRequest(BaseSchema):
 class ConfigurationDoneArguments(BaseSchema):
     """
     Arguments for 'configurationDone' request.
-    
-    The configurationDone request has no standardized attributes.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -1991,7 +2557,7 @@ class ConfigurationDoneResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -2005,7 +2571,7 @@ class ConfigurationDoneResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -2013,7 +2579,13 @@ class ConfigurationDoneResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -2037,9 +2609,13 @@ class ConfigurationDoneResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -2072,7 +2648,11 @@ class ConfigurationDoneResponse(BaseSchema):
 @register
 class LaunchRequest(BaseSchema):
     """
-    Launch request; value of command field is 'launch'.
+    This launch request is sent from the client to the debug adapter to start the debuggee with or
+    without debugging (if 'noDebug' is true).
+    
+    Since launching is debugger/runtime specific, the arguments for this request are not part of this
+    specification.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -2080,7 +2660,7 @@ class LaunchRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -2107,7 +2687,7 @@ class LaunchRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param LaunchRequestArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'launch'
@@ -2195,7 +2775,7 @@ class LaunchResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -2209,7 +2789,7 @@ class LaunchResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -2217,7 +2797,13 @@ class LaunchResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -2241,9 +2827,13 @@ class LaunchResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -2276,7 +2866,11 @@ class LaunchResponse(BaseSchema):
 @register
 class AttachRequest(BaseSchema):
     """
-    Attach request; value of command field is 'attach'.
+    The attach request is sent from the client to the debug adapter to attach to a debuggee that is
+    already running.
+    
+    Since attaching is debugger/runtime specific, the arguments for this request are not part of this
+    specification.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -2284,7 +2878,7 @@ class AttachRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -2311,7 +2905,7 @@ class AttachRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param AttachRequestArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'attach'
@@ -2391,7 +2985,7 @@ class AttachResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -2405,7 +2999,7 @@ class AttachResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -2413,7 +3007,13 @@ class AttachResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -2437,9 +3037,13 @@ class AttachResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -2472,17 +3076,11 @@ class AttachResponse(BaseSchema):
 @register
 class RestartRequest(BaseSchema):
     """
-    Restart request; value of command field is 'restart'.
+    Restarts a debug session. Clients should only call this request if the capability
+    'supportsRestartRequest' is true.
     
-    Restarts a debug session. If the capability 'supportsRestartRequest' is missing or has the value
-    false,
-    
-    the client will implement 'restart' by terminating the debug adapter first and then launching it
-    anew.
-    
-    A debug adapter can override this default behaviour by implementing a restart request
-    
-    and setting the capability 'supportsRestartRequest' to true.
+    If the capability is missing or has the value false, a typical client will emulate 'restart' by
+    terminating the debug adapter first and then launching it anew.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -2490,7 +3088,7 @@ class RestartRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -2516,7 +3114,7 @@ class RestartRequest(BaseSchema):
         """
         :param string type: 
         :param string command: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         :param RestartArguments arguments: 
         """
         self.type = 'request'
@@ -2545,8 +3143,6 @@ class RestartRequest(BaseSchema):
 class RestartArguments(BaseSchema):
     """
     Arguments for 'restart' request.
-    
-    The restart request has no standardized attributes.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -2583,7 +3179,7 @@ class RestartResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -2597,7 +3193,7 @@ class RestartResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -2605,7 +3201,13 @@ class RestartResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -2629,9 +3231,13 @@ class RestartResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -2664,7 +3270,18 @@ class RestartResponse(BaseSchema):
 @register
 class DisconnectRequest(BaseSchema):
     """
-    Disconnect request; value of command field is 'disconnect'.
+    The 'disconnect' request is sent from the client to the debug adapter in order to stop debugging.
+    
+    It asks the debug adapter to disconnect from the debuggee and to terminate the debug adapter.
+    
+    If the debuggee has been started with the 'launch' request, the 'disconnect' request terminates the
+    debuggee.
+    
+    If the 'attach' request was used to connect to the debuggee, 'disconnect' does not terminate the
+    debuggee.
+    
+    This behavior can be controlled with the 'terminateDebuggee' argument (if supported by the debug
+    adapter).
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -2672,7 +3289,7 @@ class DisconnectRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -2698,7 +3315,7 @@ class DisconnectRequest(BaseSchema):
         """
         :param string type: 
         :param string command: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         :param DisconnectArguments arguments: 
         """
         self.type = 'request'
@@ -2732,21 +3349,27 @@ class DisconnectArguments(BaseSchema):
     """
 
     __props__ = {
+        "restart": {
+            "type": "boolean",
+            "description": "A value of true indicates that this 'disconnect' request is part of a restart sequence."
+        },
         "terminateDebuggee": {
             "type": "boolean",
-            "description": "Indicates whether the debuggee should be terminated when the debugger is disconnected.\nIf unspecified, the debug adapter is free to do whatever it thinks is best.\nA client can only rely on this attribute being properly honored if a debug adapter returns true for the 'supportTerminateDebuggee' capability."
+            "description": "Indicates whether the debuggee should be terminated when the debugger is disconnected.\nIf unspecified, the debug adapter is free to do whatever it thinks is best.\nThe attribute is only honored by a debug adapter if the capability 'supportTerminateDebuggee' is true."
         }
     }
     __refs__ = set()
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, terminateDebuggee=None, **kwargs):
+    def __init__(self, restart=None, terminateDebuggee=None, **kwargs):
         """
+        :param boolean restart: A value of true indicates that this 'disconnect' request is part of a restart sequence.
         :param boolean terminateDebuggee: Indicates whether the debuggee should be terminated when the debugger is disconnected.
         If unspecified, the debug adapter is free to do whatever it thinks is best.
-        A client can only rely on this attribute being properly honored if a debug adapter returns true for the 'supportTerminateDebuggee' capability.
+        The attribute is only honored by a debug adapter if the capability 'supportTerminateDebuggee' is true.
         """
+        self.restart = restart
         self.terminateDebuggee = terminateDebuggee
         self.kwargs = kwargs
 
@@ -2754,6 +3377,8 @@ class DisconnectArguments(BaseSchema):
     def to_dict(self):
         dct = {
         }
+        if self.restart is not None:
+            dct['restart'] = self.restart
         if self.terminateDebuggee is not None:
             dct['terminateDebuggee'] = self.terminateDebuggee
         dct.update(self.kwargs)
@@ -2772,7 +3397,7 @@ class DisconnectResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -2786,7 +3411,7 @@ class DisconnectResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -2794,7 +3419,13 @@ class DisconnectResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -2818,9 +3449,13 @@ class DisconnectResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -2849,17 +3484,14 @@ class DisconnectResponse(BaseSchema):
         return dct
 
 
-@register_request('setBreakpoints')
+@register_request('terminate')
 @register
-class SetBreakpointsRequest(BaseSchema):
+class TerminateRequest(BaseSchema):
     """
-    SetBreakpoints request; value of command field is 'setBreakpoints'.
+    The 'terminate' request is sent from the client to the debug adapter in order to give the debuggee a
+    chance for terminating itself.
     
-    Sets multiple breakpoints for a single source and clears all previous breakpoints in that source.
-    
-    To clear all breakpoint for a source, specify an empty array.
-    
-    When a breakpoint is hit, a StoppedEvent (event type 'breakpoint') is generated.
+    Clients should only call this request if the capability 'supportsTerminateRequest' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -2867,7 +3499,449 @@ class SetBreakpointsRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "request"
+            ]
+        },
+        "command": {
+            "type": "string",
+            "enum": [
+                "terminate"
+            ]
+        },
+        "arguments": {
+            "type": "TerminateArguments"
+        }
+    }
+    __refs__ = {'arguments'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, seq=-1, arguments=None, **kwargs):
+        """
+        :param string type: 
+        :param string command: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param TerminateArguments arguments: 
+        """
+        self.type = 'request'
+        self.command = 'terminate'
+        self.seq = seq
+        if arguments is None:
+            self.arguments = TerminateArguments()
+        else:
+            self.arguments = TerminateArguments(**arguments) if arguments.__class__ !=  TerminateArguments else arguments
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'command': self.command,
+             'seq': self.seq,
+        }
+        if self.arguments is not None:
+            dct['arguments'] = self.arguments.to_dict()
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class TerminateArguments(BaseSchema):
+    """
+    Arguments for 'terminate' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "restart": {
+            "type": "boolean",
+            "description": "A value of true indicates that this 'terminate' request is part of a restart sequence."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, restart=None, **kwargs):
+        """
+        :param boolean restart: A value of true indicates that this 'terminate' request is part of a restart sequence.
+        """
+        self.restart = restart
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+        }
+        if self.restart is not None:
+            dct['restart'] = self.restart
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_response('terminate')
+@register
+class TerminateResponse(BaseSchema):
+    """
+    Response to 'terminate' request. This is just an acknowledgement, so no body field is required.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "response"
+            ]
+        },
+        "request_seq": {
+            "type": "integer",
+            "description": "Sequence number of the corresponding request."
+        },
+        "success": {
+            "type": "boolean",
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
+        },
+        "command": {
+            "type": "string",
+            "description": "The command requested."
+        },
+        "message": {
+            "type": "string",
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
+        },
+        "body": {
+            "type": [
+                "array",
+                "boolean",
+                "integer",
+                "null",
+                "number",
+                "object",
+                "string"
+            ],
+            "description": "Contains request result if success is true and optional error details if success is false."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, request_seq, success, command, seq=-1, message=None, body=None, **kwargs):
+        """
+        :param string type: 
+        :param integer request_seq: Sequence number of the corresponding request.
+        :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
+        :param string command: The command requested.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
+        :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
+        """
+        self.type = 'response'
+        self.request_seq = request_seq
+        self.success = success
+        self.command = command
+        self.seq = seq
+        self.message = message
+        self.body = body
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'request_seq': self.request_seq,
+             'success': self.success,
+             'command': self.command,
+             'seq': self.seq,
+        }
+        if self.message is not None:
+            dct['message'] = self.message
+        if self.body is not None:
+            dct['body'] = self.body
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_request('breakpointLocations')
+@register
+class BreakpointLocationsRequest(BaseSchema):
+    """
+    The 'breakpointLocations' request returns all possible locations for source breakpoints in a given
+    range.
+    
+    Clients should only call this request if the capability 'supportsBreakpointLocationsRequest' is
+    true.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "request"
+            ]
+        },
+        "command": {
+            "type": "string",
+            "enum": [
+                "breakpointLocations"
+            ]
+        },
+        "arguments": {
+            "type": "BreakpointLocationsArguments"
+        }
+    }
+    __refs__ = {'arguments'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, seq=-1, arguments=None, **kwargs):
+        """
+        :param string type: 
+        :param string command: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param BreakpointLocationsArguments arguments: 
+        """
+        self.type = 'request'
+        self.command = 'breakpointLocations'
+        self.seq = seq
+        if arguments is None:
+            self.arguments = BreakpointLocationsArguments()
+        else:
+            self.arguments = BreakpointLocationsArguments(**arguments) if arguments.__class__ !=  BreakpointLocationsArguments else arguments
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'command': self.command,
+             'seq': self.seq,
+        }
+        if self.arguments is not None:
+            dct['arguments'] = self.arguments.to_dict()
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class BreakpointLocationsArguments(BaseSchema):
+    """
+    Arguments for 'breakpointLocations' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "source": {
+            "description": "The source location of the breakpoints; either 'source.path' or 'source.reference' must be specified.",
+            "type": "Source"
+        },
+        "line": {
+            "type": "integer",
+            "description": "Start line of range to search possible breakpoint locations in. If only the line is specified, the request returns all possible locations in that line."
+        },
+        "column": {
+            "type": "integer",
+            "description": "Optional start column of range to search possible breakpoint locations in. If no start column is given, the first column in the start line is assumed."
+        },
+        "endLine": {
+            "type": "integer",
+            "description": "Optional end line of range to search possible breakpoint locations in. If no end line is given, then the end line is assumed to be the start line."
+        },
+        "endColumn": {
+            "type": "integer",
+            "description": "Optional end column of range to search possible breakpoint locations in. If no end column is given, then it is assumed to be in the last column of the end line."
+        }
+    }
+    __refs__ = {'source'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, source, line, column=None, endLine=None, endColumn=None, **kwargs):
+        """
+        :param Source source: The source location of the breakpoints; either 'source.path' or 'source.reference' must be specified.
+        :param integer line: Start line of range to search possible breakpoint locations in. If only the line is specified, the request returns all possible locations in that line.
+        :param integer column: Optional start column of range to search possible breakpoint locations in. If no start column is given, the first column in the start line is assumed.
+        :param integer endLine: Optional end line of range to search possible breakpoint locations in. If no end line is given, then the end line is assumed to be the start line.
+        :param integer endColumn: Optional end column of range to search possible breakpoint locations in. If no end column is given, then it is assumed to be in the last column of the end line.
+        """
+        if source is None:
+            self.source = Source()
+        else:
+            self.source = Source(**source) if source.__class__ !=  Source else source
+        self.line = line
+        self.column = column
+        self.endLine = endLine
+        self.endColumn = endColumn
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'source': self.source.to_dict(),
+             'line': self.line,
+        }
+        if self.column is not None:
+            dct['column'] = self.column
+        if self.endLine is not None:
+            dct['endLine'] = self.endLine
+        if self.endColumn is not None:
+            dct['endColumn'] = self.endColumn
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_response('breakpointLocations')
+@register
+class BreakpointLocationsResponse(BaseSchema):
+    """
+    Response to 'breakpointLocations' request.
+    
+    Contains possible locations for source breakpoints.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "response"
+            ]
+        },
+        "request_seq": {
+            "type": "integer",
+            "description": "Sequence number of the corresponding request."
+        },
+        "success": {
+            "type": "boolean",
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
+        },
+        "command": {
+            "type": "string",
+            "description": "The command requested."
+        },
+        "message": {
+            "type": "string",
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
+        },
+        "body": {
+            "type": "object",
+            "properties": {
+                "breakpoints": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/BreakpointLocation"
+                    },
+                    "description": "Sorted set of possible breakpoint locations."
+                }
+            },
+            "required": [
+                "breakpoints"
+            ]
+        }
+    }
+    __refs__ = {'body'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, request_seq, success, command, body, seq=-1, message=None, **kwargs):
+        """
+        :param string type: 
+        :param integer request_seq: Sequence number of the corresponding request.
+        :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
+        :param string command: The command requested.
+        :param BreakpointLocationsResponseBody body: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
+        """
+        self.type = 'response'
+        self.request_seq = request_seq
+        self.success = success
+        self.command = command
+        if body is None:
+            self.body = BreakpointLocationsResponseBody()
+        else:
+            self.body = BreakpointLocationsResponseBody(**body) if body.__class__ !=  BreakpointLocationsResponseBody else body
+        self.seq = seq
+        self.message = message
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'request_seq': self.request_seq,
+             'success': self.success,
+             'command': self.command,
+             'body': self.body.to_dict(),
+             'seq': self.seq,
+        }
+        if self.message is not None:
+            dct['message'] = self.message
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_request('setBreakpoints')
+@register
+class SetBreakpointsRequest(BaseSchema):
+    """
+    Sets multiple breakpoints for a single source and clears all previous breakpoints in that source.
+    
+    To clear all breakpoint for a source, specify an empty array.
+    
+    When a breakpoint is hit, a 'stopped' event (with reason 'breakpoint') is generated.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -2894,7 +3968,7 @@ class SetBreakpointsRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param SetBreakpointsArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'setBreakpoints'
@@ -2927,7 +4001,7 @@ class SetBreakpointsArguments(BaseSchema):
 
     __props__ = {
         "source": {
-            "description": "The source location of the breakpoints; either source.path or source.reference must be specified.",
+            "description": "The source location of the breakpoints; either 'source.path' or 'source.reference' must be specified.",
             "type": "Source"
         },
         "breakpoints": {
@@ -2955,7 +4029,7 @@ class SetBreakpointsArguments(BaseSchema):
 
     def __init__(self, source, breakpoints=None, lines=None, sourceModified=None, **kwargs):
         """
-        :param Source source: The source location of the breakpoints; either source.path or source.reference must be specified.
+        :param Source source: The source location of the breakpoints; either 'source.path' or 'source.reference' must be specified.
         :param array breakpoints: The code locations of the breakpoints.
         :param array lines: Deprecated: The code locations of the breakpoints.
         :param boolean sourceModified: A value of true indicates that the underlying source has been modified which results in new breakpoint locations.
@@ -2996,7 +4070,7 @@ class SetBreakpointsResponse(BaseSchema):
     
     The breakpoints returned are in the same order as the elements of the 'breakpoints'
     
-    (or the deprecated 'lines') in the SetBreakpointsArguments.
+    (or the deprecated 'lines') array in the arguments.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -3004,7 +4078,7 @@ class SetBreakpointsResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -3018,7 +4092,7 @@ class SetBreakpointsResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -3026,7 +4100,13 @@ class SetBreakpointsResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -3036,7 +4116,7 @@ class SetBreakpointsResponse(BaseSchema):
                     "items": {
                         "$ref": "#/definitions/Breakpoint"
                     },
-                    "description": "Information about the breakpoints. The array elements are in the same order as the elements of the 'breakpoints' (or the deprecated 'lines') in the SetBreakpointsArguments."
+                    "description": "Information about the breakpoints.\nThe array elements are in the same order as the elements of the 'breakpoints' (or the deprecated 'lines') array in the arguments."
                 }
             },
             "required": [
@@ -3053,10 +4133,14 @@ class SetBreakpointsResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param SetBreakpointsResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -3090,13 +4174,14 @@ class SetBreakpointsResponse(BaseSchema):
 @register
 class SetFunctionBreakpointsRequest(BaseSchema):
     """
-    SetFunctionBreakpoints request; value of command field is 'setFunctionBreakpoints'.
+    Replaces all existing function breakpoints with new function breakpoints.
     
-    Sets multiple function breakpoints and clears all previous function breakpoints.
+    To clear all function breakpoints, specify an empty array.
     
-    To clear all function breakpoint, specify an empty array.
+    When a function breakpoint is hit, a 'stopped' event (with reason 'function breakpoint') is
+    generated.
     
-    When a function breakpoint is hit, a StoppedEvent (event type 'function breakpoint') is generated.
+    Clients should only call this request if the capability 'supportsFunctionBreakpoints' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -3104,7 +4189,7 @@ class SetFunctionBreakpointsRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -3131,7 +4216,7 @@ class SetFunctionBreakpointsRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param SetFunctionBreakpointsArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'setFunctionBreakpoints'
@@ -3205,7 +4290,7 @@ class SetFunctionBreakpointsResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -3219,7 +4304,7 @@ class SetFunctionBreakpointsResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -3227,7 +4312,13 @@ class SetFunctionBreakpointsResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -3254,10 +4345,14 @@ class SetFunctionBreakpointsResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param SetFunctionBreakpointsResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -3291,10 +4386,12 @@ class SetFunctionBreakpointsResponse(BaseSchema):
 @register
 class SetExceptionBreakpointsRequest(BaseSchema):
     """
-    SetExceptionBreakpoints request; value of command field is 'setExceptionBreakpoints'.
+    The request configures the debuggers response to thrown exceptions.
     
-    The request configures the debuggers response to thrown exceptions. If an exception is configured to
-    break, a StoppedEvent is fired (event type 'exception').
+    If an exception is configured to break, a 'stopped' event is fired (with reason 'exception').
+    
+    Clients should only call this request if the capability 'exceptionBreakpointFilters' returns one or
+    more filters.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -3302,7 +4399,7 @@ class SetExceptionBreakpointsRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -3329,7 +4426,7 @@ class SetExceptionBreakpointsRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param SetExceptionBreakpointsArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'setExceptionBreakpoints'
@@ -3373,7 +4470,7 @@ class SetExceptionBreakpointsArguments(BaseSchema):
             "items": {
                 "$ref": "#/definitions/ExceptionOptions"
             },
-            "description": "Configuration options for selected exceptions."
+            "description": "Configuration options for selected exceptions.\nThe attribute is only honored by a debug adapter if the capability 'supportsExceptionOptions' is true."
         }
     }
     __refs__ = set()
@@ -3384,6 +4481,7 @@ class SetExceptionBreakpointsArguments(BaseSchema):
         """
         :param array filters: IDs of checked exception options. The set of IDs is returned via the 'exceptionBreakpointFilters' capability.
         :param array exceptionOptions: Configuration options for selected exceptions.
+        The attribute is only honored by a debug adapter if the capability 'supportsExceptionOptions' is true.
         """
         self.filters = filters
         self.exceptionOptions = exceptionOptions
@@ -3413,7 +4511,7 @@ class SetExceptionBreakpointsResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -3427,7 +4525,7 @@ class SetExceptionBreakpointsResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -3435,7 +4533,13 @@ class SetExceptionBreakpointsResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -3459,9 +4563,13 @@ class SetExceptionBreakpointsResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -3490,12 +4598,659 @@ class SetExceptionBreakpointsResponse(BaseSchema):
         return dct
 
 
+@register_request('dataBreakpointInfo')
+@register
+class DataBreakpointInfoRequest(BaseSchema):
+    """
+    Obtains information on a possible data breakpoint that could be set on an expression or variable.
+    
+    Clients should only call this request if the capability 'supportsDataBreakpoints' is true.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "request"
+            ]
+        },
+        "command": {
+            "type": "string",
+            "enum": [
+                "dataBreakpointInfo"
+            ]
+        },
+        "arguments": {
+            "type": "DataBreakpointInfoArguments"
+        }
+    }
+    __refs__ = {'arguments'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, arguments, seq=-1, **kwargs):
+        """
+        :param string type: 
+        :param string command: 
+        :param DataBreakpointInfoArguments arguments: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        """
+        self.type = 'request'
+        self.command = 'dataBreakpointInfo'
+        if arguments is None:
+            self.arguments = DataBreakpointInfoArguments()
+        else:
+            self.arguments = DataBreakpointInfoArguments(**arguments) if arguments.__class__ !=  DataBreakpointInfoArguments else arguments
+        self.seq = seq
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'command': self.command,
+             'arguments': self.arguments.to_dict(),
+             'seq': self.seq,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class DataBreakpointInfoArguments(BaseSchema):
+    """
+    Arguments for 'dataBreakpointInfo' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "variablesReference": {
+            "type": "integer",
+            "description": "Reference to the Variable container if the data breakpoint is requested for a child of the container."
+        },
+        "name": {
+            "type": "string",
+            "description": "The name of the Variable's child to obtain data breakpoint information for.\nIf variableReference isn\u2019t provided, this can be an expression."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, name, variablesReference=None, **kwargs):
+        """
+        :param string name: The name of the Variable's child to obtain data breakpoint information for.
+        If variableReference isn’t provided, this can be an expression.
+        :param integer variablesReference: Reference to the Variable container if the data breakpoint is requested for a child of the container.
+        """
+        self.name = name
+        self.variablesReference = variablesReference
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'name': self.name,
+        }
+        if self.variablesReference is not None:
+            dct['variablesReference'] = self.variablesReference
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_response('dataBreakpointInfo')
+@register
+class DataBreakpointInfoResponse(BaseSchema):
+    """
+    Response to 'dataBreakpointInfo' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "response"
+            ]
+        },
+        "request_seq": {
+            "type": "integer",
+            "description": "Sequence number of the corresponding request."
+        },
+        "success": {
+            "type": "boolean",
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
+        },
+        "command": {
+            "type": "string",
+            "description": "The command requested."
+        },
+        "message": {
+            "type": "string",
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
+        },
+        "body": {
+            "type": "object",
+            "properties": {
+                "dataId": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "description": "An identifier for the data on which a data breakpoint can be registered with the setDataBreakpoints request or null if no data breakpoint is available."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "UI string that describes on what data the breakpoint is set on or why a data breakpoint is not available."
+                },
+                "accessTypes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/DataBreakpointAccessType"
+                    },
+                    "description": "Optional attribute listing the available access types for a potential data breakpoint. A UI frontend could surface this information."
+                },
+                "canPersist": {
+                    "type": "boolean",
+                    "description": "Optional attribute indicating that a potential data breakpoint could be persisted across sessions."
+                }
+            },
+            "required": [
+                "dataId",
+                "description"
+            ]
+        }
+    }
+    __refs__ = {'body'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, request_seq, success, command, body, seq=-1, message=None, **kwargs):
+        """
+        :param string type: 
+        :param integer request_seq: Sequence number of the corresponding request.
+        :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
+        :param string command: The command requested.
+        :param DataBreakpointInfoResponseBody body: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
+        """
+        self.type = 'response'
+        self.request_seq = request_seq
+        self.success = success
+        self.command = command
+        if body is None:
+            self.body = DataBreakpointInfoResponseBody()
+        else:
+            self.body = DataBreakpointInfoResponseBody(**body) if body.__class__ !=  DataBreakpointInfoResponseBody else body
+        self.seq = seq
+        self.message = message
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'request_seq': self.request_seq,
+             'success': self.success,
+             'command': self.command,
+             'body': self.body.to_dict(),
+             'seq': self.seq,
+        }
+        if self.message is not None:
+            dct['message'] = self.message
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_request('setDataBreakpoints')
+@register
+class SetDataBreakpointsRequest(BaseSchema):
+    """
+    Replaces all existing data breakpoints with new data breakpoints.
+    
+    To clear all data breakpoints, specify an empty array.
+    
+    When a data breakpoint is hit, a 'stopped' event (with reason 'data breakpoint') is generated.
+    
+    Clients should only call this request if the capability 'supportsDataBreakpoints' is true.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "request"
+            ]
+        },
+        "command": {
+            "type": "string",
+            "enum": [
+                "setDataBreakpoints"
+            ]
+        },
+        "arguments": {
+            "type": "SetDataBreakpointsArguments"
+        }
+    }
+    __refs__ = {'arguments'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, arguments, seq=-1, **kwargs):
+        """
+        :param string type: 
+        :param string command: 
+        :param SetDataBreakpointsArguments arguments: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        """
+        self.type = 'request'
+        self.command = 'setDataBreakpoints'
+        if arguments is None:
+            self.arguments = SetDataBreakpointsArguments()
+        else:
+            self.arguments = SetDataBreakpointsArguments(**arguments) if arguments.__class__ !=  SetDataBreakpointsArguments else arguments
+        self.seq = seq
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'command': self.command,
+             'arguments': self.arguments.to_dict(),
+             'seq': self.seq,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class SetDataBreakpointsArguments(BaseSchema):
+    """
+    Arguments for 'setDataBreakpoints' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "breakpoints": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/DataBreakpoint"
+            },
+            "description": "The contents of this array replaces all existing data breakpoints. An empty array clears all data breakpoints."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, breakpoints, **kwargs):
+        """
+        :param array breakpoints: The contents of this array replaces all existing data breakpoints. An empty array clears all data breakpoints.
+        """
+        self.breakpoints = breakpoints
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'breakpoints': self.breakpoints,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_response('setDataBreakpoints')
+@register
+class SetDataBreakpointsResponse(BaseSchema):
+    """
+    Response to 'setDataBreakpoints' request.
+    
+    Returned is information about each breakpoint created by this request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "response"
+            ]
+        },
+        "request_seq": {
+            "type": "integer",
+            "description": "Sequence number of the corresponding request."
+        },
+        "success": {
+            "type": "boolean",
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
+        },
+        "command": {
+            "type": "string",
+            "description": "The command requested."
+        },
+        "message": {
+            "type": "string",
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
+        },
+        "body": {
+            "type": "object",
+            "properties": {
+                "breakpoints": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Breakpoint"
+                    },
+                    "description": "Information about the data breakpoints. The array elements correspond to the elements of the input argument 'breakpoints' array."
+                }
+            },
+            "required": [
+                "breakpoints"
+            ]
+        }
+    }
+    __refs__ = {'body'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, request_seq, success, command, body, seq=-1, message=None, **kwargs):
+        """
+        :param string type: 
+        :param integer request_seq: Sequence number of the corresponding request.
+        :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
+        :param string command: The command requested.
+        :param SetDataBreakpointsResponseBody body: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
+        """
+        self.type = 'response'
+        self.request_seq = request_seq
+        self.success = success
+        self.command = command
+        if body is None:
+            self.body = SetDataBreakpointsResponseBody()
+        else:
+            self.body = SetDataBreakpointsResponseBody(**body) if body.__class__ !=  SetDataBreakpointsResponseBody else body
+        self.seq = seq
+        self.message = message
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'request_seq': self.request_seq,
+             'success': self.success,
+             'command': self.command,
+             'body': self.body.to_dict(),
+             'seq': self.seq,
+        }
+        if self.message is not None:
+            dct['message'] = self.message
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_request('setInstructionBreakpoints')
+@register
+class SetInstructionBreakpointsRequest(BaseSchema):
+    """
+    Replaces all existing instruction breakpoints. Typically, instruction breakpoints would be set from
+    a diassembly window.
+    
+    To clear all instruction breakpoints, specify an empty array.
+    
+    When an instruction breakpoint is hit, a 'stopped' event (with reason 'instruction breakpoint') is
+    generated.
+    
+    Clients should only call this request if the capability 'supportsInstructionBreakpoints' is true.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "request"
+            ]
+        },
+        "command": {
+            "type": "string",
+            "enum": [
+                "setInstructionBreakpoints"
+            ]
+        },
+        "arguments": {
+            "type": "SetInstructionBreakpointsArguments"
+        }
+    }
+    __refs__ = {'arguments'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, arguments, seq=-1, **kwargs):
+        """
+        :param string type: 
+        :param string command: 
+        :param SetInstructionBreakpointsArguments arguments: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        """
+        self.type = 'request'
+        self.command = 'setInstructionBreakpoints'
+        if arguments is None:
+            self.arguments = SetInstructionBreakpointsArguments()
+        else:
+            self.arguments = SetInstructionBreakpointsArguments(**arguments) if arguments.__class__ !=  SetInstructionBreakpointsArguments else arguments
+        self.seq = seq
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'command': self.command,
+             'arguments': self.arguments.to_dict(),
+             'seq': self.seq,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class SetInstructionBreakpointsArguments(BaseSchema):
+    """
+    Arguments for 'setInstructionBreakpoints' request
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "breakpoints": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/InstructionBreakpoint"
+            },
+            "description": "The instruction references of the breakpoints"
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, breakpoints, **kwargs):
+        """
+        :param array breakpoints: The instruction references of the breakpoints
+        """
+        self.breakpoints = breakpoints
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'breakpoints': self.breakpoints,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_response('setInstructionBreakpoints')
+@register
+class SetInstructionBreakpointsResponse(BaseSchema):
+    """
+    Response to 'setInstructionBreakpoints' request
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "response"
+            ]
+        },
+        "request_seq": {
+            "type": "integer",
+            "description": "Sequence number of the corresponding request."
+        },
+        "success": {
+            "type": "boolean",
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
+        },
+        "command": {
+            "type": "string",
+            "description": "The command requested."
+        },
+        "message": {
+            "type": "string",
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
+        },
+        "body": {
+            "type": "object",
+            "properties": {
+                "breakpoints": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Breakpoint"
+                    },
+                    "description": "Information about the breakpoints. The array elements correspond to the elements of the 'breakpoints' array."
+                }
+            },
+            "required": [
+                "breakpoints"
+            ]
+        }
+    }
+    __refs__ = {'body'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, request_seq, success, command, body, seq=-1, message=None, **kwargs):
+        """
+        :param string type: 
+        :param integer request_seq: Sequence number of the corresponding request.
+        :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
+        :param string command: The command requested.
+        :param SetInstructionBreakpointsResponseBody body: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
+        """
+        self.type = 'response'
+        self.request_seq = request_seq
+        self.success = success
+        self.command = command
+        if body is None:
+            self.body = SetInstructionBreakpointsResponseBody()
+        else:
+            self.body = SetInstructionBreakpointsResponseBody(**body) if body.__class__ !=  SetInstructionBreakpointsResponseBody else body
+        self.seq = seq
+        self.message = message
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'request_seq': self.request_seq,
+             'success': self.success,
+             'command': self.command,
+             'body': self.body.to_dict(),
+             'seq': self.seq,
+        }
+        if self.message is not None:
+            dct['message'] = self.message
+        dct.update(self.kwargs)
+        return dct
+
+
 @register_request('continue')
 @register
 class ContinueRequest(BaseSchema):
     """
-    Continue request; value of command field is 'continue'.
-    
     The request starts the debuggee to run again.
 
     Note: automatically generated code. Do not edit manually.
@@ -3504,7 +5259,7 @@ class ContinueRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -3531,7 +5286,7 @@ class ContinueRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param ContinueArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'continue'
@@ -3565,7 +5320,7 @@ class ContinueArguments(BaseSchema):
     __props__ = {
         "threadId": {
             "type": "integer",
-            "description": "Continue execution for the specified thread (if possible). If the backend cannot continue on a single thread but will continue on all threads, it should set the allThreadsContinued attribute in the response to true."
+            "description": "Continue execution for the specified thread (if possible).\nIf the backend cannot continue on a single thread but will continue on all threads, it should set the 'allThreadsContinued' attribute in the response to true."
         }
     }
     __refs__ = set()
@@ -3574,7 +5329,8 @@ class ContinueArguments(BaseSchema):
 
     def __init__(self, threadId, **kwargs):
         """
-        :param integer threadId: Continue execution for the specified thread (if possible). If the backend cannot continue on a single thread but will continue on all threads, it should set the allThreadsContinued attribute in the response to true.
+        :param integer threadId: Continue execution for the specified thread (if possible).
+        If the backend cannot continue on a single thread but will continue on all threads, it should set the 'allThreadsContinued' attribute in the response to true.
         """
         self.threadId = threadId
         self.kwargs = kwargs
@@ -3600,7 +5356,7 @@ class ContinueResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -3614,7 +5370,7 @@ class ContinueResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -3622,14 +5378,20 @@ class ContinueResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
             "properties": {
                 "allThreadsContinued": {
                     "type": "boolean",
-                    "description": "If true, the continue request has ignored the specified thread and continued all threads instead. If this attribute is missing a value of 'true' is assumed for backward compatibility."
+                    "description": "If true, the 'continue' request has ignored the specified thread and continued all threads instead.\nIf this attribute is missing a value of 'true' is assumed for backward compatibility."
                 }
             }
         }
@@ -3643,10 +5405,14 @@ class ContinueResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param ContinueResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -3680,11 +5446,9 @@ class ContinueResponse(BaseSchema):
 @register
 class NextRequest(BaseSchema):
     """
-    Next request; value of command field is 'next'.
-    
     The request starts the debuggee to run again for one step.
     
-    The debug adapter first sends the NextResponse and then a StoppedEvent (event type 'step') after the
+    The debug adapter first sends the response and then a 'stopped' event (with reason 'step') after the
     step has completed.
 
     Note: automatically generated code. Do not edit manually.
@@ -3693,7 +5457,7 @@ class NextRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -3720,7 +5484,7 @@ class NextRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param NextArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'next'
@@ -3755,17 +5519,26 @@ class NextArguments(BaseSchema):
         "threadId": {
             "type": "integer",
             "description": "Execute 'next' for this thread."
+        },
+        "granularity": {
+            "description": "Optional granularity to step. If no granularity is specified, a granularity of 'statement' is assumed.",
+            "type": "SteppingGranularity"
         }
     }
-    __refs__ = set()
+    __refs__ = {'granularity'}
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, threadId, **kwargs):
+    def __init__(self, threadId, granularity=None, **kwargs):
         """
         :param integer threadId: Execute 'next' for this thread.
+        :param SteppingGranularity granularity: Optional granularity to step. If no granularity is specified, a granularity of 'statement' is assumed.
         """
         self.threadId = threadId
+        if granularity is None:
+            self.granularity = SteppingGranularity()
+        else:
+            self.granularity = SteppingGranularity(**granularity) if granularity.__class__ !=  SteppingGranularity else granularity
         self.kwargs = kwargs
 
 
@@ -3773,6 +5546,8 @@ class NextArguments(BaseSchema):
         dct = {
              'threadId': self.threadId,
         }
+        if self.granularity is not None:
+            dct['granularity'] = self.granularity.to_dict()
         dct.update(self.kwargs)
         return dct
 
@@ -3789,7 +5564,7 @@ class NextResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -3803,7 +5578,7 @@ class NextResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -3811,7 +5586,13 @@ class NextResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -3835,9 +5616,13 @@ class NextResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -3870,14 +5655,12 @@ class NextResponse(BaseSchema):
 @register
 class StepInRequest(BaseSchema):
     """
-    StepIn request; value of command field is 'stepIn'.
-    
     The request starts the debuggee to step into a function/method if possible.
     
     If it cannot step into a target, 'stepIn' behaves like 'next'.
     
-    The debug adapter first sends the StepInResponse and then a StoppedEvent (event type 'step') after
-    the step has completed.
+    The debug adapter first sends the response and then a 'stopped' event (with reason 'step') after the
+    step has completed.
     
     If there are multiple function/method calls (or other targets) on the source line,
     
@@ -3892,7 +5675,7 @@ class StepInRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -3919,7 +5702,7 @@ class StepInRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param StepInArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'stepIn'
@@ -3958,19 +5741,28 @@ class StepInArguments(BaseSchema):
         "targetId": {
             "type": "integer",
             "description": "Optional id of the target to step into."
+        },
+        "granularity": {
+            "description": "Optional granularity to step. If no granularity is specified, a granularity of 'statement' is assumed.",
+            "type": "SteppingGranularity"
         }
     }
-    __refs__ = set()
+    __refs__ = {'granularity'}
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, threadId, targetId=None, **kwargs):
+    def __init__(self, threadId, targetId=None, granularity=None, **kwargs):
         """
         :param integer threadId: Execute 'stepIn' for this thread.
         :param integer targetId: Optional id of the target to step into.
+        :param SteppingGranularity granularity: Optional granularity to step. If no granularity is specified, a granularity of 'statement' is assumed.
         """
         self.threadId = threadId
         self.targetId = targetId
+        if granularity is None:
+            self.granularity = SteppingGranularity()
+        else:
+            self.granularity = SteppingGranularity(**granularity) if granularity.__class__ !=  SteppingGranularity else granularity
         self.kwargs = kwargs
 
 
@@ -3980,6 +5772,8 @@ class StepInArguments(BaseSchema):
         }
         if self.targetId is not None:
             dct['targetId'] = self.targetId
+        if self.granularity is not None:
+            dct['granularity'] = self.granularity.to_dict()
         dct.update(self.kwargs)
         return dct
 
@@ -3996,7 +5790,7 @@ class StepInResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -4010,7 +5804,7 @@ class StepInResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -4018,7 +5812,13 @@ class StepInResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -4042,9 +5842,13 @@ class StepInResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -4077,12 +5881,10 @@ class StepInResponse(BaseSchema):
 @register
 class StepOutRequest(BaseSchema):
     """
-    StepOut request; value of command field is 'stepOut'.
-    
     The request starts the debuggee to run again for one step.
     
-    The debug adapter first sends the StepOutResponse and then a StoppedEvent (event type 'step') after
-    the step has completed.
+    The debug adapter first sends the response and then a 'stopped' event (with reason 'step') after the
+    step has completed.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -4090,7 +5892,7 @@ class StepOutRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -4117,7 +5919,7 @@ class StepOutRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param StepOutArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'stepOut'
@@ -4152,17 +5954,26 @@ class StepOutArguments(BaseSchema):
         "threadId": {
             "type": "integer",
             "description": "Execute 'stepOut' for this thread."
+        },
+        "granularity": {
+            "description": "Optional granularity to step. If no granularity is specified, a granularity of 'statement' is assumed.",
+            "type": "SteppingGranularity"
         }
     }
-    __refs__ = set()
+    __refs__ = {'granularity'}
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, threadId, **kwargs):
+    def __init__(self, threadId, granularity=None, **kwargs):
         """
         :param integer threadId: Execute 'stepOut' for this thread.
+        :param SteppingGranularity granularity: Optional granularity to step. If no granularity is specified, a granularity of 'statement' is assumed.
         """
         self.threadId = threadId
+        if granularity is None:
+            self.granularity = SteppingGranularity()
+        else:
+            self.granularity = SteppingGranularity(**granularity) if granularity.__class__ !=  SteppingGranularity else granularity
         self.kwargs = kwargs
 
 
@@ -4170,6 +5981,8 @@ class StepOutArguments(BaseSchema):
         dct = {
              'threadId': self.threadId,
         }
+        if self.granularity is not None:
+            dct['granularity'] = self.granularity.to_dict()
         dct.update(self.kwargs)
         return dct
 
@@ -4186,7 +5999,7 @@ class StepOutResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -4200,7 +6013,7 @@ class StepOutResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -4208,7 +6021,13 @@ class StepOutResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -4232,9 +6051,13 @@ class StepOutResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -4267,13 +6090,12 @@ class StepOutResponse(BaseSchema):
 @register
 class StepBackRequest(BaseSchema):
     """
-    StepBack request; value of command field is 'stepBack'.
-    
     The request starts the debuggee to run one step backwards.
     
-    The debug adapter first sends the StepBackResponse and then a StoppedEvent (event type 'step') after
-    the step has completed. Clients should only call this request if the capability supportsStepBack is
-    true.
+    The debug adapter first sends the response and then a 'stopped' event (with reason 'step') after the
+    step has completed.
+    
+    Clients should only call this request if the capability 'supportsStepBack' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -4281,7 +6103,7 @@ class StepBackRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -4308,7 +6130,7 @@ class StepBackRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param StepBackArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'stepBack'
@@ -4343,17 +6165,26 @@ class StepBackArguments(BaseSchema):
         "threadId": {
             "type": "integer",
             "description": "Execute 'stepBack' for this thread."
+        },
+        "granularity": {
+            "description": "Optional granularity to step. If no granularity is specified, a granularity of 'statement' is assumed.",
+            "type": "SteppingGranularity"
         }
     }
-    __refs__ = set()
+    __refs__ = {'granularity'}
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, threadId, **kwargs):
+    def __init__(self, threadId, granularity=None, **kwargs):
         """
         :param integer threadId: Execute 'stepBack' for this thread.
+        :param SteppingGranularity granularity: Optional granularity to step. If no granularity is specified, a granularity of 'statement' is assumed.
         """
         self.threadId = threadId
+        if granularity is None:
+            self.granularity = SteppingGranularity()
+        else:
+            self.granularity = SteppingGranularity(**granularity) if granularity.__class__ !=  SteppingGranularity else granularity
         self.kwargs = kwargs
 
 
@@ -4361,6 +6192,8 @@ class StepBackArguments(BaseSchema):
         dct = {
              'threadId': self.threadId,
         }
+        if self.granularity is not None:
+            dct['granularity'] = self.granularity.to_dict()
         dct.update(self.kwargs)
         return dct
 
@@ -4377,7 +6210,7 @@ class StepBackResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -4391,7 +6224,7 @@ class StepBackResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -4399,7 +6232,13 @@ class StepBackResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -4423,9 +6262,13 @@ class StepBackResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -4458,10 +6301,9 @@ class StepBackResponse(BaseSchema):
 @register
 class ReverseContinueRequest(BaseSchema):
     """
-    ReverseContinue request; value of command field is 'reverseContinue'.
+    The request starts the debuggee to run backward.
     
-    The request starts the debuggee to run backward. Clients should only call this request if the
-    capability supportsStepBack is true.
+    Clients should only call this request if the capability 'supportsStepBack' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -4469,7 +6311,7 @@ class ReverseContinueRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -4496,7 +6338,7 @@ class ReverseContinueRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param ReverseContinueArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'reverseContinue'
@@ -4566,7 +6408,7 @@ class ReverseContinueResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -4580,7 +6422,7 @@ class ReverseContinueResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -4588,7 +6430,13 @@ class ReverseContinueResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -4612,9 +6460,13 @@ class ReverseContinueResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -4647,12 +6499,12 @@ class ReverseContinueResponse(BaseSchema):
 @register
 class RestartFrameRequest(BaseSchema):
     """
-    RestartFrame request; value of command field is 'restartFrame'.
-    
     The request restarts execution of the specified stackframe.
     
-    The debug adapter first sends the RestartFrameResponse and then a StoppedEvent (event type
-    'restart') after the restart has completed.
+    The debug adapter first sends the response and then a 'stopped' event (with reason 'restart') after
+    the restart has completed.
+    
+    Clients should only call this request if the capability 'supportsRestartFrame' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -4660,7 +6512,7 @@ class RestartFrameRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -4687,7 +6539,7 @@ class RestartFrameRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param RestartFrameArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'restartFrame'
@@ -4756,7 +6608,7 @@ class RestartFrameResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -4770,7 +6622,7 @@ class RestartFrameResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -4778,7 +6630,13 @@ class RestartFrameResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -4802,9 +6660,13 @@ class RestartFrameResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -4837,15 +6699,16 @@ class RestartFrameResponse(BaseSchema):
 @register
 class GotoRequest(BaseSchema):
     """
-    Goto request; value of command field is 'goto'.
-    
     The request sets the location where the debuggee will continue to run.
     
     This makes it possible to skip the execution of code or to executed code again.
     
     The code between the current location and the goto target is not executed but skipped.
     
-    The debug adapter first sends the GotoResponse and then a StoppedEvent (event type 'goto').
+    The debug adapter first sends the response and then a 'stopped' event with reason 'goto'.
+    
+    Clients should only call this request if the capability 'supportsGotoTargetsRequest' is true
+    (because only then goto targets exist that can be passed as arguments).
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -4853,7 +6716,7 @@ class GotoRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -4880,7 +6743,7 @@ class GotoRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param GotoArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'goto'
@@ -4956,7 +6819,7 @@ class GotoResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -4970,7 +6833,7 @@ class GotoResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -4978,7 +6841,13 @@ class GotoResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -5002,9 +6871,13 @@ class GotoResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -5037,11 +6910,9 @@ class GotoResponse(BaseSchema):
 @register
 class PauseRequest(BaseSchema):
     """
-    Pause request; value of command field is 'pause'.
+    The request suspends the debuggee.
     
-    The request suspenses the debuggee.
-    
-    The debug adapter first sends the PauseResponse and then a StoppedEvent (event type 'pause') after
+    The debug adapter first sends the response and then a 'stopped' event (with reason 'pause') after
     the thread has been paused successfully.
 
     Note: automatically generated code. Do not edit manually.
@@ -5050,7 +6921,7 @@ class PauseRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -5077,7 +6948,7 @@ class PauseRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param PauseArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'pause'
@@ -5146,7 +7017,7 @@ class PauseResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -5160,7 +7031,7 @@ class PauseResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -5168,7 +7039,13 @@ class PauseResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -5192,9 +7069,13 @@ class PauseResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -5227,8 +7108,7 @@ class PauseResponse(BaseSchema):
 @register
 class StackTraceRequest(BaseSchema):
     """
-    StackTrace request; value of command field is 'stackTrace'. The request returns a stacktrace from
-    the current execution state.
+    The request returns a stacktrace from the current execution state.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -5236,7 +7116,7 @@ class StackTraceRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -5263,7 +7143,7 @@ class StackTraceRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param StackTraceArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'stackTrace'
@@ -5308,7 +7188,7 @@ class StackTraceArguments(BaseSchema):
             "description": "The maximum number of frames to return. If levels is not specified or 0, all frames are returned."
         },
         "format": {
-            "description": "Specifies details on how to format the stack frames.",
+            "description": "Specifies details on how to format the stack frames.\nThe attribute is only honored by a debug adapter if the capability 'supportsValueFormattingOptions' is true.",
             "type": "StackFrameFormat"
         }
     }
@@ -5322,6 +7202,7 @@ class StackTraceArguments(BaseSchema):
         :param integer startFrame: The index of the first frame to return; if omitted frames start at 0.
         :param integer levels: The maximum number of frames to return. If levels is not specified or 0, all frames are returned.
         :param StackFrameFormat format: Specifies details on how to format the stack frames.
+        The attribute is only honored by a debug adapter if the capability 'supportsValueFormattingOptions' is true.
         """
         self.threadId = threadId
         self.startFrame = startFrame
@@ -5359,7 +7240,7 @@ class StackTraceResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -5373,7 +7254,7 @@ class StackTraceResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -5381,7 +7262,13 @@ class StackTraceResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -5412,10 +7299,14 @@ class StackTraceResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param StackTraceResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -5449,8 +7340,6 @@ class StackTraceResponse(BaseSchema):
 @register
 class ScopesRequest(BaseSchema):
     """
-    Scopes request; value of command field is 'scopes'.
-    
     The request returns the variable scopes for a given stackframe ID.
 
     Note: automatically generated code. Do not edit manually.
@@ -5459,7 +7348,7 @@ class ScopesRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -5486,7 +7375,7 @@ class ScopesRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param ScopesArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'scopes'
@@ -5555,7 +7444,7 @@ class ScopesResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -5569,7 +7458,7 @@ class ScopesResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -5577,7 +7466,13 @@ class ScopesResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -5604,10 +7499,14 @@ class ScopesResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param ScopesResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -5641,8 +7540,6 @@ class ScopesResponse(BaseSchema):
 @register
 class VariablesRequest(BaseSchema):
     """
-    Variables request; value of command field is 'variables'.
-    
     Retrieves all child variables for the given variable reference.
     
     An optional filter can be used to limit the fetched children to either named or indexed children.
@@ -5653,7 +7550,7 @@ class VariablesRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -5680,7 +7577,7 @@ class VariablesRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param VariablesArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'variables'
@@ -5722,7 +7619,7 @@ class VariablesArguments(BaseSchema):
                 "indexed",
                 "named"
             ],
-            "description": "Optional filter to limit the child variables to either named or indexed. If ommited, both types are fetched."
+            "description": "Optional filter to limit the child variables to either named or indexed. If omitted, both types are fetched."
         },
         "start": {
             "type": "integer",
@@ -5733,7 +7630,7 @@ class VariablesArguments(BaseSchema):
             "description": "The number of variables to return. If count is missing or 0, all variables are returned."
         },
         "format": {
-            "description": "Specifies details on how to format the Variable values.",
+            "description": "Specifies details on how to format the Variable values.\nThe attribute is only honored by a debug adapter if the capability 'supportsValueFormattingOptions' is true.",
             "type": "ValueFormat"
         }
     }
@@ -5744,10 +7641,11 @@ class VariablesArguments(BaseSchema):
     def __init__(self, variablesReference, filter=None, start=None, count=None, format=None, **kwargs):
         """
         :param integer variablesReference: The Variable reference.
-        :param string filter: Optional filter to limit the child variables to either named or indexed. If ommited, both types are fetched.
+        :param string filter: Optional filter to limit the child variables to either named or indexed. If omitted, both types are fetched.
         :param integer start: The index of the first variable to return; if omitted children start at 0.
         :param integer count: The number of variables to return. If count is missing or 0, all variables are returned.
         :param ValueFormat format: Specifies details on how to format the Variable values.
+        The attribute is only honored by a debug adapter if the capability 'supportsValueFormattingOptions' is true.
         """
         self.variablesReference = variablesReference
         self.filter = filter
@@ -5788,7 +7686,7 @@ class VariablesResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -5802,7 +7700,7 @@ class VariablesResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -5810,7 +7708,13 @@ class VariablesResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -5837,10 +7741,14 @@ class VariablesResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param VariablesResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -5874,9 +7782,8 @@ class VariablesResponse(BaseSchema):
 @register
 class SetVariableRequest(BaseSchema):
     """
-    setVariable request; value of command field is 'setVariable'.
-    
-    Set the variable with the given name in the variable container to a new value.
+    Set the variable with the given name in the variable container to a new value. Clients should only
+    call this request if the capability 'supportsSetVariable' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -5884,7 +7791,7 @@ class SetVariableRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -5911,7 +7818,7 @@ class SetVariableRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param SetVariableArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'setVariable'
@@ -5949,7 +7856,7 @@ class SetVariableArguments(BaseSchema):
         },
         "name": {
             "type": "string",
-            "description": "The name of the variable."
+            "description": "The name of the variable in the container."
         },
         "value": {
             "type": "string",
@@ -5967,7 +7874,7 @@ class SetVariableArguments(BaseSchema):
     def __init__(self, variablesReference, name, value, format=None, **kwargs):
         """
         :param integer variablesReference: The reference of the variable container.
-        :param string name: The name of the variable.
+        :param string name: The name of the variable in the container.
         :param string value: The value of the variable.
         :param ValueFormat format: Specifies details on how to format the response value.
         """
@@ -6005,7 +7912,7 @@ class SetVariableResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -6019,7 +7926,7 @@ class SetVariableResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -6027,7 +7934,13 @@ class SetVariableResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -6041,16 +7954,16 @@ class SetVariableResponse(BaseSchema):
                     "description": "The type of the new value. Typically shown in the UI when hovering over the value."
                 },
                 "variablesReference": {
-                    "type": "number",
-                    "description": "If variablesReference is > 0, the new value is structured and its children can be retrieved by passing variablesReference to the VariablesRequest."
+                    "type": "integer",
+                    "description": "If variablesReference is > 0, the new value is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
                 },
                 "namedVariables": {
-                    "type": "number",
-                    "description": "The number of named child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks."
+                    "type": "integer",
+                    "description": "The number of named child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
                 },
                 "indexedVariables": {
-                    "type": "number",
-                    "description": "The number of indexed child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks."
+                    "type": "integer",
+                    "description": "The number of indexed child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
                 }
             },
             "required": [
@@ -6067,10 +7980,14 @@ class SetVariableResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param SetVariableResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -6104,8 +8021,6 @@ class SetVariableResponse(BaseSchema):
 @register
 class SourceRequest(BaseSchema):
     """
-    Source request; value of command field is 'source'.
-    
     The request retrieves the source code for a given source reference.
 
     Note: automatically generated code. Do not edit manually.
@@ -6114,7 +8029,7 @@ class SourceRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -6141,7 +8056,7 @@ class SourceRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param SourceArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'source'
@@ -6179,7 +8094,7 @@ class SourceArguments(BaseSchema):
         },
         "sourceReference": {
             "type": "integer",
-            "description": "The reference to the source. This is the same as source.sourceReference. This is provided for backward compatibility since old backends do not understand the 'source' attribute."
+            "description": "The reference to the source. This is the same as source.sourceReference.\nThis is provided for backward compatibility since old backends do not understand the 'source' attribute."
         }
     }
     __refs__ = {'source'}
@@ -6188,7 +8103,8 @@ class SourceArguments(BaseSchema):
 
     def __init__(self, sourceReference, source=None, **kwargs):
         """
-        :param integer sourceReference: The reference to the source. This is the same as source.sourceReference. This is provided for backward compatibility since old backends do not understand the 'source' attribute.
+        :param integer sourceReference: The reference to the source. This is the same as source.sourceReference.
+        This is provided for backward compatibility since old backends do not understand the 'source' attribute.
         :param Source source: Specifies the source content to load. Either source.path or source.sourceReference must be specified.
         """
         self.sourceReference = sourceReference
@@ -6221,7 +8137,7 @@ class SourceResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -6235,7 +8151,7 @@ class SourceResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -6243,7 +8159,13 @@ class SourceResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -6271,10 +8193,14 @@ class SourceResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param SourceResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -6308,8 +8234,6 @@ class SourceResponse(BaseSchema):
 @register
 class ThreadsRequest(BaseSchema):
     """
-    Thread request; value of command field is 'threads'.
-    
     The request retrieves a list of all threads.
 
     Note: automatically generated code. Do not edit manually.
@@ -6318,7 +8242,7 @@ class ThreadsRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -6353,7 +8277,7 @@ class ThreadsRequest(BaseSchema):
         """
         :param string type: 
         :param string command: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] arguments: Object containing arguments for the command.
         """
         self.type = 'request'
@@ -6387,7 +8311,7 @@ class ThreadsResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -6401,7 +8325,7 @@ class ThreadsResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -6409,7 +8333,13 @@ class ThreadsResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -6436,10 +8366,14 @@ class ThreadsResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param ThreadsResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -6473,9 +8407,9 @@ class ThreadsResponse(BaseSchema):
 @register
 class TerminateThreadsRequest(BaseSchema):
     """
-    Terminate thread request; value of command field is 'terminateThreads'.
-    
     The request terminates the threads with the given ids.
+    
+    Clients should only call this request if the capability 'supportsTerminateThreadsRequest' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -6483,7 +8417,7 @@ class TerminateThreadsRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -6510,7 +8444,7 @@ class TerminateThreadsRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param TerminateThreadsArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'terminateThreads'
@@ -6584,7 +8518,7 @@ class TerminateThreadsResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -6598,7 +8532,7 @@ class TerminateThreadsResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -6606,7 +8540,13 @@ class TerminateThreadsResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": [
@@ -6630,9 +8570,13 @@ class TerminateThreadsResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] body: Contains request result if success is true and optional error details if success is false.
         """
         self.type = 'response'
@@ -6665,8 +8609,10 @@ class TerminateThreadsResponse(BaseSchema):
 @register
 class ModulesRequest(BaseSchema):
     """
-    Modules can be retrieved from the debug adapter with the ModulesRequest which can either return all
+    Modules can be retrieved from the debug adapter with this request which can either return all
     modules or a range of modules to support paging.
+    
+    Clients should only call this request if the capability 'supportsModulesRequest' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -6674,7 +8620,7 @@ class ModulesRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -6701,7 +8647,7 @@ class ModulesRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param ModulesArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'modules'
@@ -6779,7 +8725,7 @@ class ModulesResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -6793,7 +8739,7 @@ class ModulesResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -6801,7 +8747,13 @@ class ModulesResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -6832,10 +8784,14 @@ class ModulesResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param ModulesResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -6870,6 +8826,8 @@ class ModulesResponse(BaseSchema):
 class LoadedSourcesRequest(BaseSchema):
     """
     Retrieves the set of all sources currently loaded by the debugged process.
+    
+    Clients should only call this request if the capability 'supportsLoadedSourcesRequest' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -6877,7 +8835,7 @@ class LoadedSourcesRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -6903,7 +8861,7 @@ class LoadedSourcesRequest(BaseSchema):
         """
         :param string type: 
         :param string command: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         :param LoadedSourcesArguments arguments: 
         """
         self.type = 'request'
@@ -6932,8 +8890,6 @@ class LoadedSourcesRequest(BaseSchema):
 class LoadedSourcesArguments(BaseSchema):
     """
     Arguments for 'loadedSources' request.
-    
-    The 'loadedSources' request has no standardized arguments.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -6970,7 +8926,7 @@ class LoadedSourcesResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -6984,7 +8940,7 @@ class LoadedSourcesResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -6992,7 +8948,13 @@ class LoadedSourcesResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -7019,10 +8981,14 @@ class LoadedSourcesResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param LoadedSourcesResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -7056,8 +9022,6 @@ class LoadedSourcesResponse(BaseSchema):
 @register
 class EvaluateRequest(BaseSchema):
     """
-    Evaluate request; value of command field is 'evaluate'.
-    
     Evaluates the given expression in the context of the top most stack frame.
     
     The expression has access to any variables and arguments that are in scope.
@@ -7068,7 +9032,7 @@ class EvaluateRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -7095,7 +9059,7 @@ class EvaluateRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param EvaluateArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'evaluate'
@@ -7140,17 +9104,19 @@ class EvaluateArguments(BaseSchema):
             "_enum": [
                 "watch",
                 "repl",
-                "hover"
+                "hover",
+                "clipboard"
             ],
             "enumDescriptions": [
                 "evaluate is run in a watch.",
                 "evaluate is run from REPL console.",
-                "evaluate is run from a data hover."
+                "evaluate is run from a data hover.",
+                "evaluate is run to generate the value that will be stored in the clipboard.\nThe attribute is only honored by a debug adapter if the capability 'supportsClipboardContext' is true."
             ],
             "description": "The context in which the evaluate request is run."
         },
         "format": {
-            "description": "Specifies details on how to format the Evaluate result.",
+            "description": "Specifies details on how to format the Evaluate result.\nThe attribute is only honored by a debug adapter if the capability 'supportsValueFormattingOptions' is true.",
             "type": "ValueFormat"
         }
     }
@@ -7164,6 +9130,7 @@ class EvaluateArguments(BaseSchema):
         :param integer frameId: Evaluate the expression in the scope of this stack frame. If not specified, the expression is evaluated in the global scope.
         :param string context: The context in which the evaluate request is run.
         :param ValueFormat format: Specifies details on how to format the Evaluate result.
+        The attribute is only honored by a debug adapter if the capability 'supportsValueFormattingOptions' is true.
         """
         self.expression = expression
         self.frameId = frameId
@@ -7201,7 +9168,7 @@ class EvaluateResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -7215,7 +9182,7 @@ class EvaluateResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -7223,7 +9190,13 @@ class EvaluateResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -7234,23 +9207,27 @@ class EvaluateResponse(BaseSchema):
                 },
                 "type": {
                     "type": "string",
-                    "description": "The optional type of the evaluate result."
+                    "description": "The optional type of the evaluate result.\nThis attribute should only be returned by a debug adapter if the client has passed the value true for the 'supportsVariableType' capability of the 'initialize' request."
                 },
                 "presentationHint": {
                     "$ref": "#/definitions/VariablePresentationHint",
                     "description": "Properties of a evaluate result that can be used to determine how to render the result in the UI."
                 },
                 "variablesReference": {
-                    "type": "number",
-                    "description": "If variablesReference is > 0, the evaluate result is structured and its children can be retrieved by passing variablesReference to the VariablesRequest."
+                    "type": "integer",
+                    "description": "If variablesReference is > 0, the evaluate result is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
                 },
                 "namedVariables": {
-                    "type": "number",
-                    "description": "The number of named child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks."
+                    "type": "integer",
+                    "description": "The number of named child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
                 },
                 "indexedVariables": {
-                    "type": "number",
-                    "description": "The number of indexed child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks."
+                    "type": "integer",
+                    "description": "The number of indexed child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
+                },
+                "memoryReference": {
+                    "type": "string",
+                    "description": "Optional memory reference to a location appropriate for this result.\nFor pointer type eval results, this is generally a reference to the memory address contained in the pointer.\nThis attribute should be returned by a debug adapter if the client has passed the value true for the 'supportsMemoryReferences' capability of the 'initialize' request."
                 }
             },
             "required": [
@@ -7268,10 +9245,14 @@ class EvaluateResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param EvaluateResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -7305,12 +9286,12 @@ class EvaluateResponse(BaseSchema):
 @register
 class SetExpressionRequest(BaseSchema):
     """
-    SetExpression request; value of command field is 'setExpression'.
-    
     Evaluates the given 'value' expression and assigns it to the 'expression' which must be a modifiable
     l-value.
     
     The expressions have access to any variables and arguments that are in scope of the specified frame.
+    
+    Clients should only call this request if the capability 'supportsSetExpression' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -7318,7 +9299,7 @@ class SetExpressionRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -7345,7 +9326,7 @@ class SetExpressionRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param SetExpressionArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'setExpression'
@@ -7440,7 +9421,7 @@ class SetExpressionResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -7454,7 +9435,7 @@ class SetExpressionResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -7462,7 +9443,13 @@ class SetExpressionResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -7473,23 +9460,23 @@ class SetExpressionResponse(BaseSchema):
                 },
                 "type": {
                     "type": "string",
-                    "description": "The optional type of the value."
+                    "description": "The optional type of the value.\nThis attribute should only be returned by a debug adapter if the client has passed the value true for the 'supportsVariableType' capability of the 'initialize' request."
                 },
                 "presentationHint": {
                     "$ref": "#/definitions/VariablePresentationHint",
                     "description": "Properties of a value that can be used to determine how to render the result in the UI."
                 },
                 "variablesReference": {
-                    "type": "number",
-                    "description": "If variablesReference is > 0, the value is structured and its children can be retrieved by passing variablesReference to the VariablesRequest."
+                    "type": "integer",
+                    "description": "If variablesReference is > 0, the value is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
                 },
                 "namedVariables": {
-                    "type": "number",
-                    "description": "The number of named child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks."
+                    "type": "integer",
+                    "description": "The number of named child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
                 },
                 "indexedVariables": {
-                    "type": "number",
-                    "description": "The number of indexed child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks."
+                    "type": "integer",
+                    "description": "The number of indexed child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
                 }
             },
             "required": [
@@ -7506,10 +9493,14 @@ class SetExpressionResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param SetExpressionResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -7543,14 +9534,14 @@ class SetExpressionResponse(BaseSchema):
 @register
 class StepInTargetsRequest(BaseSchema):
     """
-    StepInTargets request; value of command field is 'stepInTargets'.
-    
     This request retrieves the possible stepIn targets for the specified stack frame.
     
     These targets can be used in the 'stepIn' request.
     
     The StepInTargets may only be called if the 'supportsStepInTargetsRequest' capability exists and is
     true.
+    
+    Clients should only call this request if the capability 'supportsStepInTargetsRequest' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -7558,7 +9549,7 @@ class StepInTargetsRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -7585,7 +9576,7 @@ class StepInTargetsRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param StepInTargetsArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'stepInTargets'
@@ -7654,7 +9645,7 @@ class StepInTargetsResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -7668,7 +9659,7 @@ class StepInTargetsResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -7676,7 +9667,13 @@ class StepInTargetsResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -7703,10 +9700,14 @@ class StepInTargetsResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param StepInTargetsResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -7740,14 +9741,11 @@ class StepInTargetsResponse(BaseSchema):
 @register
 class GotoTargetsRequest(BaseSchema):
     """
-    GotoTargets request; value of command field is 'gotoTargets'.
-    
     This request retrieves the possible goto targets for the specified source location.
     
     These targets can be used in the 'goto' request.
     
-    The GotoTargets request may only be called if the 'supportsGotoTargetsRequest' capability exists and
-    is true.
+    Clients should only call this request if the capability 'supportsGotoTargetsRequest' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -7755,7 +9753,7 @@ class GotoTargetsRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -7782,7 +9780,7 @@ class GotoTargetsRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param GotoTargetsArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'gotoTargets'
@@ -7869,7 +9867,7 @@ class GotoTargetsResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -7883,7 +9881,7 @@ class GotoTargetsResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -7891,7 +9889,13 @@ class GotoTargetsResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -7918,10 +9922,14 @@ class GotoTargetsResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param GotoTargetsResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -7955,12 +9963,9 @@ class GotoTargetsResponse(BaseSchema):
 @register
 class CompletionsRequest(BaseSchema):
     """
-    CompletionsRequest request; value of command field is 'completions'.
-    
     Returns a list of possible completions for a given caret position and text.
     
-    The CompletionsRequest may only be called if the 'supportsCompletionsRequest' capability exists and
-    is true.
+    Clients should only call this request if the capability 'supportsCompletionsRequest' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -7968,7 +9973,7 @@ class CompletionsRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -7995,7 +10000,7 @@ class CompletionsRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param CompletionsArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'completions'
@@ -8087,7 +10092,7 @@ class CompletionsResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -8101,7 +10106,7 @@ class CompletionsResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -8109,7 +10114,13 @@ class CompletionsResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -8136,10 +10147,14 @@ class CompletionsResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param CompletionsResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -8173,9 +10188,9 @@ class CompletionsResponse(BaseSchema):
 @register
 class ExceptionInfoRequest(BaseSchema):
     """
-    ExceptionInfoRequest request; value of command field is 'exceptionInfo'.
+    Retrieves the details of the exception that caused this event to be raised.
     
-    Retrieves the details of the exception that caused the StoppedEvent to be raised.
+    Clients should only call this request if the capability 'supportsExceptionInfoRequest' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -8183,7 +10198,7 @@ class ExceptionInfoRequest(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -8210,7 +10225,7 @@ class ExceptionInfoRequest(BaseSchema):
         :param string type: 
         :param string command: 
         :param ExceptionInfoArguments arguments: 
-        :param integer seq: Sequence number.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
         """
         self.type = 'request'
         self.command = 'exceptionInfo'
@@ -8279,7 +10294,7 @@ class ExceptionInfoResponse(BaseSchema):
     __props__ = {
         "seq": {
             "type": "integer",
-            "description": "Sequence number."
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
         },
         "type": {
             "type": "string",
@@ -8293,7 +10308,7 @@ class ExceptionInfoResponse(BaseSchema):
         },
         "success": {
             "type": "boolean",
-            "description": "Outcome of the request."
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
         },
         "command": {
             "type": "string",
@@ -8301,7 +10316,13 @@ class ExceptionInfoResponse(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "Contains error message if success == false."
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
         },
         "body": {
             "type": "object",
@@ -8338,10 +10359,14 @@ class ExceptionInfoResponse(BaseSchema):
         :param string type: 
         :param integer request_seq: Sequence number of the corresponding request.
         :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
         :param string command: The command requested.
         :param ExceptionInfoResponseBody body: 
-        :param integer seq: Sequence number.
-        :param string message: Contains error message if success == false.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
         """
         self.type = 'response'
         self.request_seq = request_seq
@@ -8367,6 +10392,464 @@ class ExceptionInfoResponse(BaseSchema):
         }
         if self.message is not None:
             dct['message'] = self.message
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_request('readMemory')
+@register
+class ReadMemoryRequest(BaseSchema):
+    """
+    Reads bytes from memory at the provided location.
+    
+    Clients should only call this request if the capability 'supportsReadMemoryRequest' is true.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "request"
+            ]
+        },
+        "command": {
+            "type": "string",
+            "enum": [
+                "readMemory"
+            ]
+        },
+        "arguments": {
+            "type": "ReadMemoryArguments"
+        }
+    }
+    __refs__ = {'arguments'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, arguments, seq=-1, **kwargs):
+        """
+        :param string type: 
+        :param string command: 
+        :param ReadMemoryArguments arguments: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        """
+        self.type = 'request'
+        self.command = 'readMemory'
+        if arguments is None:
+            self.arguments = ReadMemoryArguments()
+        else:
+            self.arguments = ReadMemoryArguments(**arguments) if arguments.__class__ !=  ReadMemoryArguments else arguments
+        self.seq = seq
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'command': self.command,
+             'arguments': self.arguments.to_dict(),
+             'seq': self.seq,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class ReadMemoryArguments(BaseSchema):
+    """
+    Arguments for 'readMemory' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "memoryReference": {
+            "type": "string",
+            "description": "Memory reference to the base location from which data should be read."
+        },
+        "offset": {
+            "type": "integer",
+            "description": "Optional offset (in bytes) to be applied to the reference location before reading data. Can be negative."
+        },
+        "count": {
+            "type": "integer",
+            "description": "Number of bytes to read at the specified location and offset."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, memoryReference, count, offset=None, **kwargs):
+        """
+        :param string memoryReference: Memory reference to the base location from which data should be read.
+        :param integer count: Number of bytes to read at the specified location and offset.
+        :param integer offset: Optional offset (in bytes) to be applied to the reference location before reading data. Can be negative.
+        """
+        self.memoryReference = memoryReference
+        self.count = count
+        self.offset = offset
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'memoryReference': self.memoryReference,
+             'count': self.count,
+        }
+        if self.offset is not None:
+            dct['offset'] = self.offset
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_response('readMemory')
+@register
+class ReadMemoryResponse(BaseSchema):
+    """
+    Response to 'readMemory' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "response"
+            ]
+        },
+        "request_seq": {
+            "type": "integer",
+            "description": "Sequence number of the corresponding request."
+        },
+        "success": {
+            "type": "boolean",
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
+        },
+        "command": {
+            "type": "string",
+            "description": "The command requested."
+        },
+        "message": {
+            "type": "string",
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
+        },
+        "body": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "description": "The address of the first byte of data returned.\nTreated as a hex value if prefixed with '0x', or as a decimal value otherwise."
+                },
+                "unreadableBytes": {
+                    "type": "integer",
+                    "description": "The number of unreadable bytes encountered after the last successfully read byte.\nThis can be used to determine the number of bytes that must be skipped before a subsequent 'readMemory' request will succeed."
+                },
+                "data": {
+                    "type": "string",
+                    "description": "The bytes read from memory, encoded using base64."
+                }
+            },
+            "required": [
+                "address"
+            ]
+        }
+    }
+    __refs__ = {'body'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, request_seq, success, command, seq=-1, message=None, body=None, **kwargs):
+        """
+        :param string type: 
+        :param integer request_seq: Sequence number of the corresponding request.
+        :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
+        :param string command: The command requested.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
+        :param ReadMemoryResponseBody body: 
+        """
+        self.type = 'response'
+        self.request_seq = request_seq
+        self.success = success
+        self.command = command
+        self.seq = seq
+        self.message = message
+        if body is None:
+            self.body = ReadMemoryResponseBody()
+        else:
+            self.body = ReadMemoryResponseBody(**body) if body.__class__ !=  ReadMemoryResponseBody else body
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'request_seq': self.request_seq,
+             'success': self.success,
+             'command': self.command,
+             'seq': self.seq,
+        }
+        if self.message is not None:
+            dct['message'] = self.message
+        if self.body is not None:
+            dct['body'] = self.body.to_dict()
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_request('disassemble')
+@register
+class DisassembleRequest(BaseSchema):
+    """
+    Disassembles code stored at the provided location.
+    
+    Clients should only call this request if the capability 'supportsDisassembleRequest' is true.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "request"
+            ]
+        },
+        "command": {
+            "type": "string",
+            "enum": [
+                "disassemble"
+            ]
+        },
+        "arguments": {
+            "type": "DisassembleArguments"
+        }
+    }
+    __refs__ = {'arguments'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, arguments, seq=-1, **kwargs):
+        """
+        :param string type: 
+        :param string command: 
+        :param DisassembleArguments arguments: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        """
+        self.type = 'request'
+        self.command = 'disassemble'
+        if arguments is None:
+            self.arguments = DisassembleArguments()
+        else:
+            self.arguments = DisassembleArguments(**arguments) if arguments.__class__ !=  DisassembleArguments else arguments
+        self.seq = seq
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'command': self.command,
+             'arguments': self.arguments.to_dict(),
+             'seq': self.seq,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class DisassembleArguments(BaseSchema):
+    """
+    Arguments for 'disassemble' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "memoryReference": {
+            "type": "string",
+            "description": "Memory reference to the base location containing the instructions to disassemble."
+        },
+        "offset": {
+            "type": "integer",
+            "description": "Optional offset (in bytes) to be applied to the reference location before disassembling. Can be negative."
+        },
+        "instructionOffset": {
+            "type": "integer",
+            "description": "Optional offset (in instructions) to be applied after the byte offset (if any) before disassembling. Can be negative."
+        },
+        "instructionCount": {
+            "type": "integer",
+            "description": "Number of instructions to disassemble starting at the specified location and offset.\nAn adapter must return exactly this number of instructions - any unavailable instructions should be replaced with an implementation-defined 'invalid instruction' value."
+        },
+        "resolveSymbols": {
+            "type": "boolean",
+            "description": "If true, the adapter should attempt to resolve memory addresses and other values to symbolic names."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, memoryReference, instructionCount, offset=None, instructionOffset=None, resolveSymbols=None, **kwargs):
+        """
+        :param string memoryReference: Memory reference to the base location containing the instructions to disassemble.
+        :param integer instructionCount: Number of instructions to disassemble starting at the specified location and offset.
+        An adapter must return exactly this number of instructions - any unavailable instructions should be replaced with an implementation-defined 'invalid instruction' value.
+        :param integer offset: Optional offset (in bytes) to be applied to the reference location before disassembling. Can be negative.
+        :param integer instructionOffset: Optional offset (in instructions) to be applied after the byte offset (if any) before disassembling. Can be negative.
+        :param boolean resolveSymbols: If true, the adapter should attempt to resolve memory addresses and other values to symbolic names.
+        """
+        self.memoryReference = memoryReference
+        self.instructionCount = instructionCount
+        self.offset = offset
+        self.instructionOffset = instructionOffset
+        self.resolveSymbols = resolveSymbols
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'memoryReference': self.memoryReference,
+             'instructionCount': self.instructionCount,
+        }
+        if self.offset is not None:
+            dct['offset'] = self.offset
+        if self.instructionOffset is not None:
+            dct['instructionOffset'] = self.instructionOffset
+        if self.resolveSymbols is not None:
+            dct['resolveSymbols'] = self.resolveSymbols
+        dct.update(self.kwargs)
+        return dct
+
+
+@register_response('disassemble')
+@register
+class DisassembleResponse(BaseSchema):
+    """
+    Response to 'disassemble' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "response"
+            ]
+        },
+        "request_seq": {
+            "type": "integer",
+            "description": "Sequence number of the corresponding request."
+        },
+        "success": {
+            "type": "boolean",
+            "description": "Outcome of the request.\nIf true, the request was successful and the 'body' attribute may contain the result of the request.\nIf the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error')."
+        },
+        "command": {
+            "type": "string",
+            "description": "The command requested."
+        },
+        "message": {
+            "type": "string",
+            "description": "Contains the raw error in short form if 'success' is false.\nThis raw error might be interpreted by the frontend and is not shown in the UI.\nSome predefined values exist.",
+            "_enum": [
+                "cancelled"
+            ],
+            "enumDescriptions": [
+                "request was cancelled."
+            ]
+        },
+        "body": {
+            "type": "object",
+            "properties": {
+                "instructions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/DisassembledInstruction"
+                    },
+                    "description": "The list of disassembled instructions."
+                }
+            },
+            "required": [
+                "instructions"
+            ]
+        }
+    }
+    __refs__ = {'body'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, request_seq, success, command, seq=-1, message=None, body=None, **kwargs):
+        """
+        :param string type: 
+        :param integer request_seq: Sequence number of the corresponding request.
+        :param boolean success: Outcome of the request.
+        If true, the request was successful and the 'body' attribute may contain the result of the request.
+        If the value is false, the attribute 'message' contains the error in short form and the 'body' may contain additional information (see 'ErrorResponse.body.error').
+        :param string command: The command requested.
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        :param string message: Contains the raw error in short form if 'success' is false.
+        This raw error might be interpreted by the frontend and is not shown in the UI.
+        Some predefined values exist.
+        :param DisassembleResponseBody body: 
+        """
+        self.type = 'response'
+        self.request_seq = request_seq
+        self.success = success
+        self.command = command
+        self.seq = seq
+        self.message = message
+        if body is None:
+            self.body = DisassembleResponseBody()
+        else:
+            self.body = DisassembleResponseBody(**body) if body.__class__ !=  DisassembleResponseBody else body
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'request_seq': self.request_seq,
+             'success': self.success,
+             'command': self.command,
+             'seq': self.seq,
+        }
+        if self.message is not None:
+            dct['message'] = self.message
+        if self.body is not None:
+            dct['body'] = self.body.to_dict()
         dct.update(self.kwargs)
         return dct
 
@@ -8431,6 +10914,13 @@ class Capabilities(BaseSchema):
             "type": "boolean",
             "description": "The debug adapter supports the 'completions' request."
         },
+        "completionTriggerCharacters": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "The set of characters that should trigger completion in a REPL. If not specified, the UI should assume the '.' character."
+        },
         "supportsModulesRequest": {
             "type": "boolean",
             "description": "The debug adapter supports the 'modules' request."
@@ -8488,13 +10978,49 @@ class Capabilities(BaseSchema):
         "supportsSetExpression": {
             "type": "boolean",
             "description": "The debug adapter supports the 'setExpression' request."
+        },
+        "supportsTerminateRequest": {
+            "type": "boolean",
+            "description": "The debug adapter supports the 'terminate' request."
+        },
+        "supportsDataBreakpoints": {
+            "type": "boolean",
+            "description": "The debug adapter supports data breakpoints."
+        },
+        "supportsReadMemoryRequest": {
+            "type": "boolean",
+            "description": "The debug adapter supports the 'readMemory' request."
+        },
+        "supportsDisassembleRequest": {
+            "type": "boolean",
+            "description": "The debug adapter supports the 'disassemble' request."
+        },
+        "supportsCancelRequest": {
+            "type": "boolean",
+            "description": "The debug adapter supports the 'cancel' request."
+        },
+        "supportsBreakpointLocationsRequest": {
+            "type": "boolean",
+            "description": "The debug adapter supports the 'breakpointLocations' request."
+        },
+        "supportsClipboardContext": {
+            "type": "boolean",
+            "description": "The debug adapter supports the 'clipboard' context value in the 'evaluate' request."
+        },
+        "supportsSteppingGranularity": {
+            "type": "boolean",
+            "description": "The debug adapter supports stepping granularities (argument 'granularity') for the stepping requests."
+        },
+        "supportsInstructionBreakpoints": {
+            "type": "boolean",
+            "description": "The debug adapter supports adding breakpoints based on instruction references."
         }
     }
     __refs__ = set()
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, supportsConfigurationDoneRequest=None, supportsFunctionBreakpoints=None, supportsConditionalBreakpoints=None, supportsHitConditionalBreakpoints=None, supportsEvaluateForHovers=None, exceptionBreakpointFilters=None, supportsStepBack=None, supportsSetVariable=None, supportsRestartFrame=None, supportsGotoTargetsRequest=None, supportsStepInTargetsRequest=None, supportsCompletionsRequest=None, supportsModulesRequest=None, additionalModuleColumns=None, supportedChecksumAlgorithms=None, supportsRestartRequest=None, supportsExceptionOptions=None, supportsValueFormattingOptions=None, supportsExceptionInfoRequest=None, supportTerminateDebuggee=None, supportsDelayedStackTraceLoading=None, supportsLoadedSourcesRequest=None, supportsLogPoints=None, supportsTerminateThreadsRequest=None, supportsSetExpression=None, **kwargs):
+    def __init__(self, supportsConfigurationDoneRequest=None, supportsFunctionBreakpoints=None, supportsConditionalBreakpoints=None, supportsHitConditionalBreakpoints=None, supportsEvaluateForHovers=None, exceptionBreakpointFilters=None, supportsStepBack=None, supportsSetVariable=None, supportsRestartFrame=None, supportsGotoTargetsRequest=None, supportsStepInTargetsRequest=None, supportsCompletionsRequest=None, completionTriggerCharacters=None, supportsModulesRequest=None, additionalModuleColumns=None, supportedChecksumAlgorithms=None, supportsRestartRequest=None, supportsExceptionOptions=None, supportsValueFormattingOptions=None, supportsExceptionInfoRequest=None, supportTerminateDebuggee=None, supportsDelayedStackTraceLoading=None, supportsLoadedSourcesRequest=None, supportsLogPoints=None, supportsTerminateThreadsRequest=None, supportsSetExpression=None, supportsTerminateRequest=None, supportsDataBreakpoints=None, supportsReadMemoryRequest=None, supportsDisassembleRequest=None, supportsCancelRequest=None, supportsBreakpointLocationsRequest=None, supportsClipboardContext=None, supportsSteppingGranularity=None, supportsInstructionBreakpoints=None, **kwargs):
         """
         :param boolean supportsConfigurationDoneRequest: The debug adapter supports the 'configurationDone' request.
         :param boolean supportsFunctionBreakpoints: The debug adapter supports function breakpoints.
@@ -8508,6 +11034,7 @@ class Capabilities(BaseSchema):
         :param boolean supportsGotoTargetsRequest: The debug adapter supports the 'gotoTargets' request.
         :param boolean supportsStepInTargetsRequest: The debug adapter supports the 'stepInTargets' request.
         :param boolean supportsCompletionsRequest: The debug adapter supports the 'completions' request.
+        :param array completionTriggerCharacters: The set of characters that should trigger completion in a REPL. If not specified, the UI should assume the '.' character.
         :param boolean supportsModulesRequest: The debug adapter supports the 'modules' request.
         :param array additionalModuleColumns: The set of additional module information exposed by the debug adapter.
         :param array supportedChecksumAlgorithms: Checksum algorithms supported by the debug adapter.
@@ -8521,6 +11048,15 @@ class Capabilities(BaseSchema):
         :param boolean supportsLogPoints: The debug adapter supports logpoints by interpreting the 'logMessage' attribute of the SourceBreakpoint.
         :param boolean supportsTerminateThreadsRequest: The debug adapter supports the 'terminateThreads' request.
         :param boolean supportsSetExpression: The debug adapter supports the 'setExpression' request.
+        :param boolean supportsTerminateRequest: The debug adapter supports the 'terminate' request.
+        :param boolean supportsDataBreakpoints: The debug adapter supports data breakpoints.
+        :param boolean supportsReadMemoryRequest: The debug adapter supports the 'readMemory' request.
+        :param boolean supportsDisassembleRequest: The debug adapter supports the 'disassemble' request.
+        :param boolean supportsCancelRequest: The debug adapter supports the 'cancel' request.
+        :param boolean supportsBreakpointLocationsRequest: The debug adapter supports the 'breakpointLocations' request.
+        :param boolean supportsClipboardContext: The debug adapter supports the 'clipboard' context value in the 'evaluate' request.
+        :param boolean supportsSteppingGranularity: The debug adapter supports stepping granularities (argument 'granularity') for the stepping requests.
+        :param boolean supportsInstructionBreakpoints: The debug adapter supports adding breakpoints based on instruction references.
         """
         self.supportsConfigurationDoneRequest = supportsConfigurationDoneRequest
         self.supportsFunctionBreakpoints = supportsFunctionBreakpoints
@@ -8534,6 +11070,7 @@ class Capabilities(BaseSchema):
         self.supportsGotoTargetsRequest = supportsGotoTargetsRequest
         self.supportsStepInTargetsRequest = supportsStepInTargetsRequest
         self.supportsCompletionsRequest = supportsCompletionsRequest
+        self.completionTriggerCharacters = completionTriggerCharacters
         self.supportsModulesRequest = supportsModulesRequest
         self.additionalModuleColumns = additionalModuleColumns
         self.supportedChecksumAlgorithms = supportedChecksumAlgorithms
@@ -8547,6 +11084,15 @@ class Capabilities(BaseSchema):
         self.supportsLogPoints = supportsLogPoints
         self.supportsTerminateThreadsRequest = supportsTerminateThreadsRequest
         self.supportsSetExpression = supportsSetExpression
+        self.supportsTerminateRequest = supportsTerminateRequest
+        self.supportsDataBreakpoints = supportsDataBreakpoints
+        self.supportsReadMemoryRequest = supportsReadMemoryRequest
+        self.supportsDisassembleRequest = supportsDisassembleRequest
+        self.supportsCancelRequest = supportsCancelRequest
+        self.supportsBreakpointLocationsRequest = supportsBreakpointLocationsRequest
+        self.supportsClipboardContext = supportsClipboardContext
+        self.supportsSteppingGranularity = supportsSteppingGranularity
+        self.supportsInstructionBreakpoints = supportsInstructionBreakpoints
         self.kwargs = kwargs
 
 
@@ -8577,6 +11123,8 @@ class Capabilities(BaseSchema):
             dct['supportsStepInTargetsRequest'] = self.supportsStepInTargetsRequest
         if self.supportsCompletionsRequest is not None:
             dct['supportsCompletionsRequest'] = self.supportsCompletionsRequest
+        if self.completionTriggerCharacters is not None:
+            dct['completionTriggerCharacters'] = self.completionTriggerCharacters
         if self.supportsModulesRequest is not None:
             dct['supportsModulesRequest'] = self.supportsModulesRequest
         if self.additionalModuleColumns is not None:
@@ -8603,6 +11151,24 @@ class Capabilities(BaseSchema):
             dct['supportsTerminateThreadsRequest'] = self.supportsTerminateThreadsRequest
         if self.supportsSetExpression is not None:
             dct['supportsSetExpression'] = self.supportsSetExpression
+        if self.supportsTerminateRequest is not None:
+            dct['supportsTerminateRequest'] = self.supportsTerminateRequest
+        if self.supportsDataBreakpoints is not None:
+            dct['supportsDataBreakpoints'] = self.supportsDataBreakpoints
+        if self.supportsReadMemoryRequest is not None:
+            dct['supportsReadMemoryRequest'] = self.supportsReadMemoryRequest
+        if self.supportsDisassembleRequest is not None:
+            dct['supportsDisassembleRequest'] = self.supportsDisassembleRequest
+        if self.supportsCancelRequest is not None:
+            dct['supportsCancelRequest'] = self.supportsCancelRequest
+        if self.supportsBreakpointLocationsRequest is not None:
+            dct['supportsBreakpointLocationsRequest'] = self.supportsBreakpointLocationsRequest
+        if self.supportsClipboardContext is not None:
+            dct['supportsClipboardContext'] = self.supportsClipboardContext
+        if self.supportsSteppingGranularity is not None:
+            dct['supportsSteppingGranularity'] = self.supportsSteppingGranularity
+        if self.supportsInstructionBreakpoints is not None:
+            dct['supportsInstructionBreakpoints'] = self.supportsInstructionBreakpoints
         dct.update(self.kwargs)
         return dct
 
@@ -8877,7 +11443,9 @@ class Module(BaseSchema):
 class ColumnDescriptor(BaseSchema):
     """
     A ColumnDescriptor specifies what module attribute to show in a column of the ModulesView, how to
-    format it, and what the column's label should be.
+    format it,
+    
+    and what the column's label should be.
     
     It is only used if the underlying UI actually supports this level of customization.
 
@@ -9030,8 +11598,10 @@ class Thread(BaseSchema):
 @register
 class Source(BaseSchema):
     """
-    A Source is a descriptor for source code. It is returned from the debug adapter as part of a
-    StackFrame and it is used by clients when specifying breakpoints.
+    A Source is a descriptor for source code.
+    
+    It is returned from the debug adapter as part of a StackFrame and it is used by clients when
+    specifying breakpoints.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -9039,19 +11609,19 @@ class Source(BaseSchema):
     __props__ = {
         "name": {
             "type": "string",
-            "description": "The short name of the source. Every source returned from the debug adapter has a name. When sending a source to the debug adapter this name is optional."
+            "description": "The short name of the source. Every source returned from the debug adapter has a name.\nWhen sending a source to the debug adapter this name is optional."
         },
         "path": {
             "type": "string",
-            "description": "The path of the source to be shown in the UI. It is only used to locate and load the content of the source if no sourceReference is specified (or its vaule is 0)."
+            "description": "The path of the source to be shown in the UI.\nIt is only used to locate and load the content of the source if no sourceReference is specified (or its value is 0)."
         },
         "sourceReference": {
-            "type": "number",
-            "description": "If sourceReference > 0 the contents of the source must be retrieved through the SourceRequest (even if a path is specified). A sourceReference is only valid for a session, so it must not be used to persist a source."
+            "type": "integer",
+            "description": "If sourceReference > 0 the contents of the source must be retrieved through the SourceRequest (even if a path is specified).\nA sourceReference is only valid for a session, so it must not be used to persist a source.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
         },
         "presentationHint": {
             "type": "string",
-            "description": "An optional hint for how to present the source in the UI. A value of 'deemphasize' can be used to indicate that the source is not available or that it is skipped on stepping.",
+            "description": "An optional hint for how to present the source in the UI.\nA value of 'deemphasize' can be used to indicate that the source is not available or that it is skipped on stepping.",
             "enum": [
                 "normal",
                 "emphasize",
@@ -9079,7 +11649,7 @@ class Source(BaseSchema):
                 "object",
                 "string"
             ],
-            "description": "Optional data that a debug adapter might want to loop through the client. The client should leave the data intact and persist it across sessions. The client should not interpret the data."
+            "description": "Optional data that a debug adapter might want to loop through the client.\nThe client should leave the data intact and persist it across sessions. The client should not interpret the data."
         },
         "checksums": {
             "type": "array",
@@ -9095,13 +11665,19 @@ class Source(BaseSchema):
 
     def __init__(self, name=None, path=None, sourceReference=None, presentationHint=None, origin=None, sources=None, adapterData=None, checksums=None, **kwargs):
         """
-        :param string name: The short name of the source. Every source returned from the debug adapter has a name. When sending a source to the debug adapter this name is optional.
-        :param string path: The path of the source to be shown in the UI. It is only used to locate and load the content of the source if no sourceReference is specified (or its vaule is 0).
-        :param number sourceReference: If sourceReference > 0 the contents of the source must be retrieved through the SourceRequest (even if a path is specified). A sourceReference is only valid for a session, so it must not be used to persist a source.
-        :param string presentationHint: An optional hint for how to present the source in the UI. A value of 'deemphasize' can be used to indicate that the source is not available or that it is skipped on stepping.
+        :param string name: The short name of the source. Every source returned from the debug adapter has a name.
+        When sending a source to the debug adapter this name is optional.
+        :param string path: The path of the source to be shown in the UI.
+        It is only used to locate and load the content of the source if no sourceReference is specified (or its value is 0).
+        :param integer sourceReference: If sourceReference > 0 the contents of the source must be retrieved through the SourceRequest (even if a path is specified).
+        A sourceReference is only valid for a session, so it must not be used to persist a source.
+        The value should be less than or equal to 2147483647 (2^31 - 1).
+        :param string presentationHint: An optional hint for how to present the source in the UI.
+        A value of 'deemphasize' can be used to indicate that the source is not available or that it is skipped on stepping.
         :param string origin: The (optional) origin of this source: possible values 'internal module', 'inlined content from source map', etc.
         :param array sources: An optional list of sources that are related to this source. These may be the source that generated this source.
-        :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] adapterData: Optional data that a debug adapter might want to loop through the client. The client should leave the data intact and persist it across sessions. The client should not interpret the data.
+        :param ['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'] adapterData: Optional data that a debug adapter might want to loop through the client.
+        The client should leave the data intact and persist it across sessions. The client should not interpret the data.
         :param array checksums: The checksums associated with this file.
         """
         self.name = name
@@ -9149,7 +11725,7 @@ class StackFrame(BaseSchema):
     __props__ = {
         "id": {
             "type": "integer",
-            "description": "An identifier for the stack frame. It must be unique across all threads. This id can be used to retrieve the scopes of the frame with the 'scopesRequest' or to restart the execution of a stackframe."
+            "description": "An identifier for the stack frame. It must be unique across all threads.\nThis id can be used to retrieve the scopes of the frame with the 'scopesRequest' or to restart the execution of a stackframe."
         },
         "name": {
             "type": "string",
@@ -9175,6 +11751,10 @@ class StackFrame(BaseSchema):
             "type": "integer",
             "description": "An optional end column of the range covered by the stack frame."
         },
+        "instructionPointerReference": {
+            "type": "string",
+            "description": "Optional memory reference for the current instruction pointer in this frame."
+        },
         "moduleId": {
             "type": [
                 "integer",
@@ -9189,24 +11769,27 @@ class StackFrame(BaseSchema):
                 "label",
                 "subtle"
             ],
-            "description": "An optional hint for how to present this frame in the UI. A value of 'label' can be used to indicate that the frame is an artificial frame that is used as a visual label or separator. A value of 'subtle' can be used to change the appearance of a frame in a 'subtle' way."
+            "description": "An optional hint for how to present this frame in the UI.\nA value of 'label' can be used to indicate that the frame is an artificial frame that is used as a visual label or separator. A value of 'subtle' can be used to change the appearance of a frame in a 'subtle' way."
         }
     }
     __refs__ = {'source'}
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, id, name, line, column, source=None, endLine=None, endColumn=None, moduleId=None, presentationHint=None, **kwargs):
+    def __init__(self, id, name, line, column, source=None, endLine=None, endColumn=None, instructionPointerReference=None, moduleId=None, presentationHint=None, **kwargs):
         """
-        :param integer id: An identifier for the stack frame. It must be unique across all threads. This id can be used to retrieve the scopes of the frame with the 'scopesRequest' or to restart the execution of a stackframe.
+        :param integer id: An identifier for the stack frame. It must be unique across all threads.
+        This id can be used to retrieve the scopes of the frame with the 'scopesRequest' or to restart the execution of a stackframe.
         :param string name: The name of the stack frame, typically a method name.
         :param integer line: The line within the file of the frame. If source is null or doesn't exist, line is 0 and must be ignored.
         :param integer column: The column within the line. If source is null or doesn't exist, column is 0 and must be ignored.
         :param Source source: The optional source of the frame.
         :param integer endLine: An optional end line of the range covered by the stack frame.
         :param integer endColumn: An optional end column of the range covered by the stack frame.
+        :param string instructionPointerReference: Optional memory reference for the current instruction pointer in this frame.
         :param ['integer', 'string'] moduleId: The module associated with this frame, if any.
-        :param string presentationHint: An optional hint for how to present this frame in the UI. A value of 'label' can be used to indicate that the frame is an artificial frame that is used as a visual label or separator. A value of 'subtle' can be used to change the appearance of a frame in a 'subtle' way.
+        :param string presentationHint: An optional hint for how to present this frame in the UI.
+        A value of 'label' can be used to indicate that the frame is an artificial frame that is used as a visual label or separator. A value of 'subtle' can be used to change the appearance of a frame in a 'subtle' way.
         """
         self.id = id
         self.name = name
@@ -9218,6 +11801,7 @@ class StackFrame(BaseSchema):
             self.source = Source(**source) if source.__class__ !=  Source else source
         self.endLine = endLine
         self.endColumn = endColumn
+        self.instructionPointerReference = instructionPointerReference
         self.moduleId = moduleId
         self.presentationHint = presentationHint
         self.kwargs = kwargs
@@ -9236,6 +11820,8 @@ class StackFrame(BaseSchema):
             dct['endLine'] = self.endLine
         if self.endColumn is not None:
             dct['endColumn'] = self.endColumn
+        if self.instructionPointerReference is not None:
+            dct['instructionPointerReference'] = self.instructionPointerReference
         if self.moduleId is not None:
             dct['moduleId'] = self.moduleId
         if self.presentationHint is not None:
@@ -9256,7 +11842,21 @@ class Scope(BaseSchema):
     __props__ = {
         "name": {
             "type": "string",
-            "description": "Name of the scope such as 'Arguments', 'Locals'."
+            "description": "Name of the scope such as 'Arguments', 'Locals', or 'Registers'. This string is shown in the UI as is and can be translated."
+        },
+        "presentationHint": {
+            "type": "string",
+            "description": "An optional hint for how to present this scope in the UI. If this attribute is missing, the scope is shown with a generic UI.",
+            "_enum": [
+                "arguments",
+                "locals",
+                "registers"
+            ],
+            "enumDescriptions": [
+                "Scope contains method arguments.",
+                "Scope contains local variables.",
+                "Scope contains registers. Only a single 'registers' scope should be returned from a 'scopes' request."
+            ]
         },
         "variablesReference": {
             "type": "integer",
@@ -9299,11 +11899,12 @@ class Scope(BaseSchema):
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, name, variablesReference, expensive, namedVariables=None, indexedVariables=None, source=None, line=None, column=None, endLine=None, endColumn=None, **kwargs):
+    def __init__(self, name, variablesReference, expensive, presentationHint=None, namedVariables=None, indexedVariables=None, source=None, line=None, column=None, endLine=None, endColumn=None, **kwargs):
         """
-        :param string name: Name of the scope such as 'Arguments', 'Locals'.
+        :param string name: Name of the scope such as 'Arguments', 'Locals', or 'Registers'. This string is shown in the UI as is and can be translated.
         :param integer variablesReference: The variables of this scope can be retrieved by passing the value of variablesReference to the VariablesRequest.
         :param boolean expensive: If true, the number of variables in this scope is large or expensive to retrieve.
+        :param string presentationHint: An optional hint for how to present this scope in the UI. If this attribute is missing, the scope is shown with a generic UI.
         :param integer namedVariables: The number of named variables in this scope.
         The client can use this optional information to present the variables in a paged UI and fetch them in chunks.
         :param integer indexedVariables: The number of indexed variables in this scope.
@@ -9317,6 +11918,7 @@ class Scope(BaseSchema):
         self.name = name
         self.variablesReference = variablesReference
         self.expensive = expensive
+        self.presentationHint = presentationHint
         self.namedVariables = namedVariables
         self.indexedVariables = indexedVariables
         if source is None:
@@ -9336,6 +11938,8 @@ class Scope(BaseSchema):
              'variablesReference': self.variablesReference,
              'expensive': self.expensive,
         }
+        if self.presentationHint is not None:
+            dct['presentationHint'] = self.presentationHint
         if self.namedVariables is not None:
             dct['namedVariables'] = self.namedVariables
         if self.indexedVariables is not None:
@@ -9388,7 +11992,7 @@ class Variable(BaseSchema):
         },
         "type": {
             "type": "string",
-            "description": "The type of the variable's value. Typically shown in the UI when hovering over the value."
+            "description": "The type of the variable's value. Typically shown in the UI when hovering over the value.\nThis attribute should only be returned by a debug adapter if the client has passed the value true for the 'supportsVariableType' capability of the 'initialize' request."
         },
         "presentationHint": {
             "description": "Properties of a variable that can be used to determine how to render the variable in the UI.",
@@ -9409,24 +12013,31 @@ class Variable(BaseSchema):
         "indexedVariables": {
             "type": "integer",
             "description": "The number of indexed child variables.\nThe client can use this optional information to present the children in a paged UI and fetch them in chunks."
+        },
+        "memoryReference": {
+            "type": "string",
+            "description": "Optional memory reference for the variable if the variable represents executable code, such as a function pointer.\nThis attribute is only required if the client has passed the value true for the 'supportsMemoryReferences' capability of the 'initialize' request."
         }
     }
     __refs__ = {'presentationHint'}
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, name, value, variablesReference, type=None, presentationHint=None, evaluateName=None, namedVariables=None, indexedVariables=None, **kwargs):
+    def __init__(self, name, value, variablesReference, type=None, presentationHint=None, evaluateName=None, namedVariables=None, indexedVariables=None, memoryReference=None, **kwargs):
         """
         :param string name: The variable's name.
         :param string value: The variable's value. This can be a multi-line text, e.g. for a function the body of a function.
         :param integer variablesReference: If variablesReference is > 0, the variable is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.
         :param string type: The type of the variable's value. Typically shown in the UI when hovering over the value.
+        This attribute should only be returned by a debug adapter if the client has passed the value true for the 'supportsVariableType' capability of the 'initialize' request.
         :param VariablePresentationHint presentationHint: Properties of a variable that can be used to determine how to render the variable in the UI.
         :param string evaluateName: Optional evaluatable name of this variable which can be passed to the 'EvaluateRequest' to fetch the variable's value.
         :param integer namedVariables: The number of named child variables.
         The client can use this optional information to present the children in a paged UI and fetch them in chunks.
         :param integer indexedVariables: The number of indexed child variables.
         The client can use this optional information to present the children in a paged UI and fetch them in chunks.
+        :param string memoryReference: Optional memory reference for the variable if the variable represents executable code, such as a function pointer.
+        This attribute is only required if the client has passed the value true for the 'supportsMemoryReferences' capability of the 'initialize' request.
         """
         self.name = name
         self.value = value
@@ -9439,6 +12050,7 @@ class Variable(BaseSchema):
         self.evaluateName = evaluateName
         self.namedVariables = namedVariables
         self.indexedVariables = indexedVariables
+        self.memoryReference = memoryReference
         self.kwargs = kwargs
 
 
@@ -9458,6 +12070,8 @@ class Variable(BaseSchema):
             dct['namedVariables'] = self.namedVariables
         if self.indexedVariables is not None:
             dct['indexedVariables'] = self.indexedVariables
+        if self.memoryReference is not None:
+            dct['memoryReference'] = self.memoryReference
         dct.update(self.kwargs)
         return dct
 
@@ -9485,7 +12099,8 @@ class VariablePresentationHint(BaseSchema):
                 "innerClass",
                 "interface",
                 "mostDerivedClass",
-                "virtual"
+                "virtual",
+                "dataBreakpoint"
             ],
             "enumDescriptions": [
                 "Indicates that the object is a property.",
@@ -9497,7 +12112,8 @@ class VariablePresentationHint(BaseSchema):
                 "Indicates that the object is an inner class.",
                 "Indicates that the object is an interface.",
                 "Indicates that the object is the most derived class.",
-                "Indicates that the object is virtual, that means it is a synthetic object introduced by the adapter for rendering purposes, e.g. an index range for large arrays."
+                "Indicates that the object is virtual, that means it is a synthetic object introducedby the\nadapter for rendering purposes, e.g. an index range for large arrays.",
+                "Indicates that a data breakpoint is registered for the object."
             ]
         },
         "attributes": {
@@ -9567,6 +12183,64 @@ class VariablePresentationHint(BaseSchema):
 
 
 @register
+class BreakpointLocation(BaseSchema):
+    """
+    Properties of a breakpoint location returned from the 'breakpointLocations' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "line": {
+            "type": "integer",
+            "description": "Start line of breakpoint location."
+        },
+        "column": {
+            "type": "integer",
+            "description": "Optional start column of breakpoint location."
+        },
+        "endLine": {
+            "type": "integer",
+            "description": "Optional end line of breakpoint location if the location covers a range."
+        },
+        "endColumn": {
+            "type": "integer",
+            "description": "Optional end column of breakpoint location if the location covers a range."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, line, column=None, endLine=None, endColumn=None, **kwargs):
+        """
+        :param integer line: Start line of breakpoint location.
+        :param integer column: Optional start column of breakpoint location.
+        :param integer endLine: Optional end line of breakpoint location if the location covers a range.
+        :param integer endColumn: Optional end column of breakpoint location if the location covers a range.
+        """
+        self.line = line
+        self.column = column
+        self.endLine = endLine
+        self.endColumn = endColumn
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'line': self.line,
+        }
+        if self.column is not None:
+            dct['column'] = self.column
+        if self.endLine is not None:
+            dct['endLine'] = self.endLine
+        if self.endColumn is not None:
+            dct['endColumn'] = self.endColumn
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
 class SourceBreakpoint(BaseSchema):
     """
     Properties of a breakpoint or logpoint passed to the setBreakpoints request.
@@ -9585,15 +12259,15 @@ class SourceBreakpoint(BaseSchema):
         },
         "condition": {
             "type": "string",
-            "description": "An optional expression for conditional breakpoints."
+            "description": "An optional expression for conditional breakpoints.\nIt is only honored by a debug adapter if the capability 'supportsConditionalBreakpoints' is true."
         },
         "hitCondition": {
             "type": "string",
-            "description": "An optional expression that controls how many hits of the breakpoint are ignored. The backend is expected to interpret the expression as needed."
+            "description": "An optional expression that controls how many hits of the breakpoint are ignored.\nThe backend is expected to interpret the expression as needed.\nThe attribute is only honored by a debug adapter if the capability 'supportsHitConditionalBreakpoints' is true."
         },
         "logMessage": {
             "type": "string",
-            "description": "If this attribute exists and is non-empty, the backend must not 'break' (stop) but log the message instead. Expressions within {} are interpolated."
+            "description": "If this attribute exists and is non-empty, the backend must not 'break' (stop)\nbut log the message instead. Expressions within {} are interpolated.\nThe attribute is only honored by a debug adapter if the capability 'supportsLogPoints' is true."
         }
     }
     __refs__ = set()
@@ -9605,8 +12279,13 @@ class SourceBreakpoint(BaseSchema):
         :param integer line: The source line of the breakpoint or logpoint.
         :param integer column: An optional source column of the breakpoint.
         :param string condition: An optional expression for conditional breakpoints.
-        :param string hitCondition: An optional expression that controls how many hits of the breakpoint are ignored. The backend is expected to interpret the expression as needed.
-        :param string logMessage: If this attribute exists and is non-empty, the backend must not 'break' (stop) but log the message instead. Expressions within {} are interpolated.
+        It is only honored by a debug adapter if the capability 'supportsConditionalBreakpoints' is true.
+        :param string hitCondition: An optional expression that controls how many hits of the breakpoint are ignored.
+        The backend is expected to interpret the expression as needed.
+        The attribute is only honored by a debug adapter if the capability 'supportsHitConditionalBreakpoints' is true.
+        :param string logMessage: If this attribute exists and is non-empty, the backend must not 'break' (stop)
+        but log the message instead. Expressions within {} are interpolated.
+        The attribute is only honored by a debug adapter if the capability 'supportsLogPoints' is true.
         """
         self.line = line
         self.column = column
@@ -9647,11 +12326,11 @@ class FunctionBreakpoint(BaseSchema):
         },
         "condition": {
             "type": "string",
-            "description": "An optional expression for conditional breakpoints."
+            "description": "An optional expression for conditional breakpoints.\nIt is only honored by a debug adapter if the capability 'supportsConditionalBreakpoints' is true."
         },
         "hitCondition": {
             "type": "string",
-            "description": "An optional expression that controls how many hits of the breakpoint are ignored. The backend is expected to interpret the expression as needed."
+            "description": "An optional expression that controls how many hits of the breakpoint are ignored.\nThe backend is expected to interpret the expression as needed.\nThe attribute is only honored by a debug adapter if the capability 'supportsHitConditionalBreakpoints' is true."
         }
     }
     __refs__ = set()
@@ -9662,7 +12341,10 @@ class FunctionBreakpoint(BaseSchema):
         """
         :param string name: The name of the function.
         :param string condition: An optional expression for conditional breakpoints.
-        :param string hitCondition: An optional expression that controls how many hits of the breakpoint are ignored. The backend is expected to interpret the expression as needed.
+        It is only honored by a debug adapter if the capability 'supportsConditionalBreakpoints' is true.
+        :param string hitCondition: An optional expression that controls how many hits of the breakpoint are ignored.
+        The backend is expected to interpret the expression as needed.
+        The attribute is only honored by a debug adapter if the capability 'supportsHitConditionalBreakpoints' is true.
         """
         self.name = name
         self.condition = condition
@@ -9683,9 +12365,163 @@ class FunctionBreakpoint(BaseSchema):
 
 
 @register
+class DataBreakpointAccessType(BaseSchema):
+    """
+    This enumeration defines all possible access types for data breakpoints.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {}
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, **kwargs):
+        """
+    
+        """
+    
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class DataBreakpoint(BaseSchema):
+    """
+    Properties of a data breakpoint passed to the setDataBreakpoints request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "dataId": {
+            "type": "string",
+            "description": "An id representing the data. This id is returned from the dataBreakpointInfo request."
+        },
+        "accessType": {
+            "description": "The access type of the data.",
+            "type": "DataBreakpointAccessType"
+        },
+        "condition": {
+            "type": "string",
+            "description": "An optional expression for conditional breakpoints."
+        },
+        "hitCondition": {
+            "type": "string",
+            "description": "An optional expression that controls how many hits of the breakpoint are ignored.\nThe backend is expected to interpret the expression as needed."
+        }
+    }
+    __refs__ = {'accessType'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, dataId, accessType=None, condition=None, hitCondition=None, **kwargs):
+        """
+        :param string dataId: An id representing the data. This id is returned from the dataBreakpointInfo request.
+        :param DataBreakpointAccessType accessType: The access type of the data.
+        :param string condition: An optional expression for conditional breakpoints.
+        :param string hitCondition: An optional expression that controls how many hits of the breakpoint are ignored.
+        The backend is expected to interpret the expression as needed.
+        """
+        self.dataId = dataId
+        if accessType is None:
+            self.accessType = DataBreakpointAccessType()
+        else:
+            self.accessType = DataBreakpointAccessType(**accessType) if accessType.__class__ !=  DataBreakpointAccessType else accessType
+        self.condition = condition
+        self.hitCondition = hitCondition
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'dataId': self.dataId,
+        }
+        if self.accessType is not None:
+            dct['accessType'] = self.accessType.to_dict()
+        if self.condition is not None:
+            dct['condition'] = self.condition
+        if self.hitCondition is not None:
+            dct['hitCondition'] = self.hitCondition
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class InstructionBreakpoint(BaseSchema):
+    """
+    Properties of a breakpoint passed to the setInstructionBreakpoints request
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "instructionReference": {
+            "type": "string",
+            "description": "The instruction reference of the breakpoint.\nThis should be a memory or instruction pointer reference from an EvaluateResponse, Variable, StackFrame, GotoTarget, or Breakpoint."
+        },
+        "offset": {
+            "type": "integer",
+            "description": "An optional offset from the instruction reference.\nThis can be negative."
+        },
+        "condition": {
+            "type": "string",
+            "description": "An optional expression for conditional breakpoints.\nIt is only honored by a debug adapter if the capability 'supportsConditionalBreakpoints' is true."
+        },
+        "hitCondition": {
+            "type": "string",
+            "description": "An optional expression that controls how many hits of the breakpoint are ignored.\nThe backend is expected to interpret the expression as needed.\nThe attribute is only honored by a debug adapter if the capability 'supportsHitConditionalBreakpoints' is true."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, instructionReference, offset=None, condition=None, hitCondition=None, **kwargs):
+        """
+        :param string instructionReference: The instruction reference of the breakpoint.
+        This should be a memory or instruction pointer reference from an EvaluateResponse, Variable, StackFrame, GotoTarget, or Breakpoint.
+        :param integer offset: An optional offset from the instruction reference.
+        This can be negative.
+        :param string condition: An optional expression for conditional breakpoints.
+        It is only honored by a debug adapter if the capability 'supportsConditionalBreakpoints' is true.
+        :param string hitCondition: An optional expression that controls how many hits of the breakpoint are ignored.
+        The backend is expected to interpret the expression as needed.
+        The attribute is only honored by a debug adapter if the capability 'supportsHitConditionalBreakpoints' is true.
+        """
+        self.instructionReference = instructionReference
+        self.offset = offset
+        self.condition = condition
+        self.hitCondition = hitCondition
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'instructionReference': self.instructionReference,
+        }
+        if self.offset is not None:
+            dct['offset'] = self.offset
+        if self.condition is not None:
+            dct['condition'] = self.condition
+        if self.hitCondition is not None:
+            dct['hitCondition'] = self.hitCondition
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
 class Breakpoint(BaseSchema):
     """
-    Information about a Breakpoint created in setBreakpoints or setFunctionBreakpoints.
+    Information about a Breakpoint created in setBreakpoints, setFunctionBreakpoints,
+    setInstructionBreakpoints, or setDataBreakpoints.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -9693,7 +12529,7 @@ class Breakpoint(BaseSchema):
     __props__ = {
         "id": {
             "type": "integer",
-            "description": "An optional unique identifier for the breakpoint."
+            "description": "An optional identifier for the breakpoint. It is needed if breakpoint events are used to update or remove breakpoints."
         },
         "verified": {
             "type": "boolean",
@@ -9701,7 +12537,7 @@ class Breakpoint(BaseSchema):
         },
         "message": {
             "type": "string",
-            "description": "An optional message about the state of the breakpoint. This is shown to the user and can be used to explain why a breakpoint could not be verified."
+            "description": "An optional message about the state of the breakpoint.\nThis is shown to the user and can be used to explain why a breakpoint could not be verified."
         },
         "source": {
             "description": "The source where the breakpoint is located.",
@@ -9721,23 +12557,36 @@ class Breakpoint(BaseSchema):
         },
         "endColumn": {
             "type": "integer",
-            "description": "An optional end column of the actual range covered by the breakpoint. If no end line is given, then the end column is assumed to be in the start line."
+            "description": "An optional end column of the actual range covered by the breakpoint.\nIf no end line is given, then the end column is assumed to be in the start line."
+        },
+        "instructionReference": {
+            "type": "string",
+            "description": "An optional memory reference to where the breakpoint is set."
+        },
+        "offset": {
+            "type": "integer",
+            "description": "An optional offset from the instruction reference.\nThis can be negative."
         }
     }
     __refs__ = {'source'}
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, verified, id=None, message=None, source=None, line=None, column=None, endLine=None, endColumn=None, **kwargs):
+    def __init__(self, verified, id=None, message=None, source=None, line=None, column=None, endLine=None, endColumn=None, instructionReference=None, offset=None, **kwargs):
         """
         :param boolean verified: If true breakpoint could be set (but not necessarily at the desired location).
-        :param integer id: An optional unique identifier for the breakpoint.
-        :param string message: An optional message about the state of the breakpoint. This is shown to the user and can be used to explain why a breakpoint could not be verified.
+        :param integer id: An optional identifier for the breakpoint. It is needed if breakpoint events are used to update or remove breakpoints.
+        :param string message: An optional message about the state of the breakpoint.
+        This is shown to the user and can be used to explain why a breakpoint could not be verified.
         :param Source source: The source where the breakpoint is located.
         :param integer line: The start line of the actual range covered by the breakpoint.
         :param integer column: An optional start column of the actual range covered by the breakpoint.
         :param integer endLine: An optional end line of the actual range covered by the breakpoint.
-        :param integer endColumn: An optional end column of the actual range covered by the breakpoint. If no end line is given, then the end column is assumed to be in the start line.
+        :param integer endColumn: An optional end column of the actual range covered by the breakpoint.
+        If no end line is given, then the end column is assumed to be in the start line.
+        :param string instructionReference: An optional memory reference to where the breakpoint is set.
+        :param integer offset: An optional offset from the instruction reference.
+        This can be negative.
         """
         self.verified = verified
         self.id = id
@@ -9750,6 +12599,8 @@ class Breakpoint(BaseSchema):
         self.column = column
         self.endLine = endLine
         self.endColumn = endColumn
+        self.instructionReference = instructionReference
+        self.offset = offset
         self.kwargs = kwargs
 
 
@@ -9771,6 +12622,38 @@ class Breakpoint(BaseSchema):
             dct['endLine'] = self.endLine
         if self.endColumn is not None:
             dct['endColumn'] = self.endColumn
+        if self.instructionReference is not None:
+            dct['instructionReference'] = self.instructionReference
+        if self.offset is not None:
+            dct['offset'] = self.offset
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class SteppingGranularity(BaseSchema):
+    """
+    The granularity of one 'step' in the stepping requests 'next', 'stepIn', 'stepOut', and 'stepBack'.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {}
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, **kwargs):
+        """
+    
+        """
+    
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+        }
         dct.update(self.kwargs)
         return dct
 
@@ -9851,13 +12734,17 @@ class GotoTarget(BaseSchema):
         "endColumn": {
             "type": "integer",
             "description": "An optional end column of the range covered by the goto target."
+        },
+        "instructionPointerReference": {
+            "type": "string",
+            "description": "Optional memory reference for the instruction pointer value represented by this target."
         }
     }
     __refs__ = set()
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, id, label, line, column=None, endLine=None, endColumn=None, **kwargs):
+    def __init__(self, id, label, line, column=None, endLine=None, endColumn=None, instructionPointerReference=None, **kwargs):
         """
         :param integer id: Unique identifier for a goto target. This is used in the goto request.
         :param string label: The name of the goto target (shown in the UI).
@@ -9865,6 +12752,7 @@ class GotoTarget(BaseSchema):
         :param integer column: An optional column of the goto target.
         :param integer endLine: An optional end line of the range covered by the goto target.
         :param integer endColumn: An optional end column of the range covered by the goto target.
+        :param string instructionPointerReference: Optional memory reference for the instruction pointer value represented by this target.
         """
         self.id = id
         self.label = label
@@ -9872,6 +12760,7 @@ class GotoTarget(BaseSchema):
         self.column = column
         self.endLine = endLine
         self.endColumn = endColumn
+        self.instructionPointerReference = instructionPointerReference
         self.kwargs = kwargs
 
 
@@ -9887,6 +12776,8 @@ class GotoTarget(BaseSchema):
             dct['endLine'] = self.endLine
         if self.endColumn is not None:
             dct['endColumn'] = self.endColumn
+        if self.instructionPointerReference is not None:
+            dct['instructionPointerReference'] = self.instructionPointerReference
         dct.update(self.kwargs)
         return dct
 
@@ -9908,6 +12799,10 @@ class CompletionItem(BaseSchema):
             "type": "string",
             "description": "If text is not falsy then it is inserted instead of the label."
         },
+        "sortText": {
+            "type": "string",
+            "description": "A string that should be used when comparing this item with other items. When `falsy` the label is used."
+        },
         "type": {
             "description": "The item's type. Typically the client uses this information to render the item in the UI with an icon.",
             "type": "CompletionItemType"
@@ -9919,30 +12814,48 @@ class CompletionItem(BaseSchema):
         "length": {
             "type": "integer",
             "description": "This value determines how many characters are overwritten by the completion text.\nIf missing the value 0 is assumed which results in the completion text being inserted."
+        },
+        "selectionStart": {
+            "type": "integer",
+            "description": "Determines the start of the new selection after the text has been inserted (or replaced).\nThe start position must in the range 0 and length of the completion text.\nIf omitted the selection starts at the end of the completion text."
+        },
+        "selectionLength": {
+            "type": "integer",
+            "description": "Determines the length of the new selection after the text has been inserted (or replaced).\nThe selection can not extend beyond the bounds of the completion text.\nIf omitted the length is assumed to be 0."
         }
     }
     __refs__ = {'type'}
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, label, text=None, type=None, start=None, length=None, **kwargs):
+    def __init__(self, label, text=None, sortText=None, type=None, start=None, length=None, selectionStart=None, selectionLength=None, **kwargs):
         """
         :param string label: The label of this completion item. By default this is also the text that is inserted when selecting this completion.
         :param string text: If text is not falsy then it is inserted instead of the label.
+        :param string sortText: A string that should be used when comparing this item with other items. When `falsy` the label is used.
         :param CompletionItemType type: The item's type. Typically the client uses this information to render the item in the UI with an icon.
         :param integer start: This value determines the location (in the CompletionsRequest's 'text' attribute) where the completion text is added.
         If missing the text is added at the location specified by the CompletionsRequest's 'column' attribute.
         :param integer length: This value determines how many characters are overwritten by the completion text.
         If missing the value 0 is assumed which results in the completion text being inserted.
+        :param integer selectionStart: Determines the start of the new selection after the text has been inserted (or replaced).
+        The start position must in the range 0 and length of the completion text.
+        If omitted the selection starts at the end of the completion text.
+        :param integer selectionLength: Determines the length of the new selection after the text has been inserted (or replaced).
+        The selection can not extend beyond the bounds of the completion text.
+        If omitted the length is assumed to be 0.
         """
         self.label = label
         self.text = text
+        self.sortText = sortText
         if type is None:
             self.type = CompletionItemType()
         else:
             self.type = CompletionItemType(**type) if type.__class__ !=  CompletionItemType else type
         self.start = start
         self.length = length
+        self.selectionStart = selectionStart
+        self.selectionLength = selectionLength
         self.kwargs = kwargs
 
 
@@ -9952,12 +12865,18 @@ class CompletionItem(BaseSchema):
         }
         if self.text is not None:
             dct['text'] = self.text
+        if self.sortText is not None:
+            dct['sortText'] = self.sortText
         if self.type is not None:
             dct['type'] = self.type.to_dict()
         if self.start is not None:
             dct['start'] = self.start
         if self.length is not None:
             dct['length'] = self.length
+        if self.selectionStart is not None:
+            dct['selectionStart'] = self.selectionStart
+        if self.selectionLength is not None:
+            dct['selectionLength'] = self.selectionLength
         dct.update(self.kwargs)
         return dct
 
@@ -10203,7 +13122,7 @@ class ExceptionOptions(BaseSchema):
             "items": {
                 "$ref": "#/definitions/ExceptionPathSegment"
             },
-            "description": "A path that selects a single or multiple exceptions in a tree. If 'path' is missing, the whole tree is selected. By convention the first segment of the path is a category that is used to group exceptions in the UI."
+            "description": "A path that selects a single or multiple exceptions in a tree. If 'path' is missing, the whole tree is selected.\nBy convention the first segment of the path is a category that is used to group exceptions in the UI."
         },
         "breakMode": {
             "description": "Condition when a thrown exception should result in a break.",
@@ -10217,7 +13136,8 @@ class ExceptionOptions(BaseSchema):
     def __init__(self, breakMode, path=None, **kwargs):
         """
         :param ExceptionBreakMode breakMode: Condition when a thrown exception should result in a break.
-        :param array path: A path that selects a single or multiple exceptions in a tree. If 'path' is missing, the whole tree is selected. By convention the first segment of the path is a category that is used to group exceptions in the UI.
+        :param array path: A path that selects a single or multiple exceptions in a tree. If 'path' is missing, the whole tree is selected.
+        By convention the first segment of the path is a category that is used to group exceptions in the UI.
         """
         if breakMode is None:
             self.breakMode = ExceptionBreakMode()
@@ -10246,7 +13166,7 @@ class ExceptionBreakMode(BaseSchema):
     
     always: always breaks,
     
-    unhandled: breaks when excpetion unhandled,
+    unhandled: breaks when exception unhandled,
     
     userUnhandled: breaks if the exception is not handled by user code.
 
@@ -10277,8 +13197,12 @@ class ExceptionBreakMode(BaseSchema):
 class ExceptionPathSegment(BaseSchema):
     """
     An ExceptionPathSegment represents a segment in a path that is used to match leafs or nodes in a
-    tree of exceptions. If a segment consists of more than one name, it matches the names provided if
-    'negate' is false or missing or it matches anything except the names provided if 'negate' is true.
+    tree of exceptions.
+    
+    If a segment consists of more than one name, it matches the names provided if 'negate' is false or
+    missing or
+    
+    it matches anything except the names provided if 'negate' is true.
 
     Note: automatically generated code. Do not edit manually.
     """
@@ -10399,6 +13323,146 @@ class ExceptionDetails(BaseSchema):
 
 
 @register
+class DisassembledInstruction(BaseSchema):
+    """
+    Represents a single disassembled instruction.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "address": {
+            "type": "string",
+            "description": "The address of the instruction. Treated as a hex value if prefixed with '0x', or as a decimal value otherwise."
+        },
+        "instructionBytes": {
+            "type": "string",
+            "description": "Optional raw bytes representing the instruction and its operands, in an implementation-defined format."
+        },
+        "instruction": {
+            "type": "string",
+            "description": "Text representing the instruction and its operands, in an implementation-defined format."
+        },
+        "symbol": {
+            "type": "string",
+            "description": "Name of the symbol that corresponds with the location of this instruction, if any."
+        },
+        "location": {
+            "description": "Source location that corresponds to this instruction, if any.\nShould always be set (if available) on the first instruction returned,\nbut can be omitted afterwards if this instruction maps to the same source file as the previous instruction.",
+            "type": "Source"
+        },
+        "line": {
+            "type": "integer",
+            "description": "The line within the source location that corresponds to this instruction, if any."
+        },
+        "column": {
+            "type": "integer",
+            "description": "The column within the line that corresponds to this instruction, if any."
+        },
+        "endLine": {
+            "type": "integer",
+            "description": "The end line of the range that corresponds to this instruction, if any."
+        },
+        "endColumn": {
+            "type": "integer",
+            "description": "The end column of the range that corresponds to this instruction, if any."
+        }
+    }
+    __refs__ = {'location'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, address, instruction, instructionBytes=None, symbol=None, location=None, line=None, column=None, endLine=None, endColumn=None, **kwargs):
+        """
+        :param string address: The address of the instruction. Treated as a hex value if prefixed with '0x', or as a decimal value otherwise.
+        :param string instruction: Text representing the instruction and its operands, in an implementation-defined format.
+        :param string instructionBytes: Optional raw bytes representing the instruction and its operands, in an implementation-defined format.
+        :param string symbol: Name of the symbol that corresponds with the location of this instruction, if any.
+        :param Source location: Source location that corresponds to this instruction, if any.
+        Should always be set (if available) on the first instruction returned,
+        but can be omitted afterwards if this instruction maps to the same source file as the previous instruction.
+        :param integer line: The line within the source location that corresponds to this instruction, if any.
+        :param integer column: The column within the line that corresponds to this instruction, if any.
+        :param integer endLine: The end line of the range that corresponds to this instruction, if any.
+        :param integer endColumn: The end column of the range that corresponds to this instruction, if any.
+        """
+        self.address = address
+        self.instruction = instruction
+        self.instructionBytes = instructionBytes
+        self.symbol = symbol
+        if location is None:
+            self.location = Source()
+        else:
+            self.location = Source(**location) if location.__class__ !=  Source else location
+        self.line = line
+        self.column = column
+        self.endLine = endLine
+        self.endColumn = endColumn
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'address': self.address,
+             'instruction': self.instruction,
+        }
+        if self.instructionBytes is not None:
+            dct['instructionBytes'] = self.instructionBytes
+        if self.symbol is not None:
+            dct['symbol'] = self.symbol
+        if self.location is not None:
+            dct['location'] = self.location.to_dict()
+        if self.line is not None:
+            dct['line'] = self.line
+        if self.column is not None:
+            dct['column'] = self.column
+        if self.endLine is not None:
+            dct['endLine'] = self.endLine
+        if self.endColumn is not None:
+            dct['endColumn'] = self.endColumn
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class ErrorResponseBody(BaseSchema):
+    """
+    "body" of ErrorResponse
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "error": {
+            "description": "An optional, structured error message.",
+            "type": "Message"
+        }
+    }
+    __refs__ = {'error'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, error=None, **kwargs):
+        """
+        :param Message error: An optional, structured error message.
+        """
+        if error is None:
+            self.error = Message()
+        else:
+            self.error = Message(**error) if error.__class__ !=  Message else error
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+        }
+        if self.error is not None:
+            dct['error'] = self.error.to_dict()
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
 class StoppedEventBody(BaseSchema):
     """
     "body" of StoppedEvent
@@ -10415,12 +13479,16 @@ class StoppedEventBody(BaseSchema):
                 "breakpoint",
                 "exception",
                 "pause",
-                "entry"
+                "entry",
+                "goto",
+                "function breakpoint",
+                "data breakpoint",
+                "instruction breakpoint"
             ]
         },
         "description": {
             "type": "string",
-            "description": "The full reason for the event, e.g. 'Paused on exception'. This string is shown in the UI as is."
+            "description": "The full reason for the event, e.g. 'Paused on exception'. This string is shown in the UI as is and must be translated."
         },
         "threadId": {
             "type": "integer",
@@ -10436,7 +13504,7 @@ class StoppedEventBody(BaseSchema):
         },
         "allThreadsStopped": {
             "type": "boolean",
-            "description": "If allThreadsStopped is true, a debug adapter can announce that all threads have stopped.\n*  The client should use this information to enable that all threads can be expanded to access their stacktraces.\n*  If the attribute is missing or false, only the thread with the given threadId can be expanded."
+            "description": "If 'allThreadsStopped' is true, a debug adapter can announce that all threads have stopped.\n- The client should use this information to enable that all threads can be expanded to access their stacktraces.\n- If the attribute is missing or false, only the thread with the given threadId can be expanded."
         }
     }
     __refs__ = set()
@@ -10447,13 +13515,13 @@ class StoppedEventBody(BaseSchema):
         """
         :param string reason: The reason for the event.
         For backward compatibility this string is shown in the UI if the 'description' attribute is missing (but it must not be translated).
-        :param string description: The full reason for the event, e.g. 'Paused on exception'. This string is shown in the UI as is.
+        :param string description: The full reason for the event, e.g. 'Paused on exception'. This string is shown in the UI as is and must be translated.
         :param integer threadId: The thread which was stopped.
         :param boolean preserveFocusHint: A value of true hints to the frontend that this event should not change the focus.
         :param string text: Additional information. E.g. if reason is 'exception', text contains the exception name. This string is shown in the UI.
-        :param boolean allThreadsStopped: If allThreadsStopped is true, a debug adapter can announce that all threads have stopped.
-        *  The client should use this information to enable that all threads can be expanded to access their stacktraces.
-        *  If the attribute is missing or false, only the thread with the given threadId can be expanded.
+        :param boolean allThreadsStopped: If 'allThreadsStopped' is true, a debug adapter can announce that all threads have stopped.
+        - The client should use this information to enable that all threads can be expanded to access their stacktraces.
+        - If the attribute is missing or false, only the thread with the given threadId can be expanded.
         """
         self.reason = reason
         self.description = description
@@ -10497,7 +13565,7 @@ class ContinuedEventBody(BaseSchema):
         },
         "allThreadsContinued": {
             "type": "boolean",
-            "description": "If allThreadsContinued is true, a debug adapter can announce that all threads have continued."
+            "description": "If 'allThreadsContinued' is true, a debug adapter can announce that all threads have continued."
         }
     }
     __refs__ = set()
@@ -10507,7 +13575,7 @@ class ContinuedEventBody(BaseSchema):
     def __init__(self, threadId, allThreadsContinued=None, **kwargs):
         """
         :param integer threadId: The thread which was continued.
-        :param boolean allThreadsContinued: If allThreadsContinued is true, a debug adapter can announce that all threads have continued.
+        :param boolean allThreadsContinued: If 'allThreadsContinued' is true, a debug adapter can announce that all threads have continued.
         """
         self.threadId = threadId
         self.allThreadsContinued = allThreadsContinued
@@ -10670,9 +13738,23 @@ class OutputEventBody(BaseSchema):
             "type": "string",
             "description": "The output to report."
         },
+        "group": {
+            "type": "string",
+            "description": "Support for keeping an output log organized by grouping related messages.",
+            "enum": [
+                "start",
+                "startCollapsed",
+                "end"
+            ],
+            "enumDescriptions": [
+                "Start a new group in expanded mode. Subsequent output events are members of the group and should be shown indented.\nThe 'output' attribute becomes the name of the group and is not indented.",
+                "Start a new group in collapsed mode. Subsequent output events are members of the group and should be shown indented (as soon as the group is expanded).\nThe 'output' attribute becomes the name of the group and is not indented.",
+                "End the current group and decreases the indentation of subsequent output events.\nA non empty 'output' attribute is shown as the unindented end of the group."
+            ]
+        },
         "variablesReference": {
-            "type": "number",
-            "description": "If an attribute 'variablesReference' exists and its value is > 0, the output contains objects which can be retrieved by passing variablesReference to the VariablesRequest."
+            "type": "integer",
+            "description": "If an attribute 'variablesReference' exists and its value is > 0, the output contains objects which can be retrieved by passing 'variablesReference' to the 'variables' request. The value should be less than or equal to 2147483647 (2^31 - 1)."
         },
         "source": {
             "description": "An optional source location where the output was produced.",
@@ -10703,11 +13785,12 @@ class OutputEventBody(BaseSchema):
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, output, category=None, variablesReference=None, source=None, line=None, column=None, data=None, **kwargs):
+    def __init__(self, output, category=None, group=None, variablesReference=None, source=None, line=None, column=None, data=None, **kwargs):
         """
         :param string output: The output to report.
         :param string category: The output category. If not specified, 'console' is assumed.
-        :param number variablesReference: If an attribute 'variablesReference' exists and its value is > 0, the output contains objects which can be retrieved by passing variablesReference to the VariablesRequest.
+        :param string group: Support for keeping an output log organized by grouping related messages.
+        :param integer variablesReference: If an attribute 'variablesReference' exists and its value is > 0, the output contains objects which can be retrieved by passing 'variablesReference' to the 'variables' request. The value should be less than or equal to 2147483647 (2^31 - 1).
         :param Source source: An optional source location where the output was produced.
         :param integer line: An optional source location line where the output was produced.
         :param integer column: An optional source location column where the output was produced.
@@ -10715,6 +13798,7 @@ class OutputEventBody(BaseSchema):
         """
         self.output = output
         self.category = category
+        self.group = group
         self.variablesReference = variablesReference
         if source is None:
             self.source = Source()
@@ -10732,6 +13816,8 @@ class OutputEventBody(BaseSchema):
         }
         if self.category is not None:
             dct['category'] = self.category
+        if self.group is not None:
+            dct['group'] = self.group
         if self.variablesReference is not None:
             dct['variablesReference'] = self.variablesReference
         if self.source is not None:
@@ -10765,7 +13851,7 @@ class BreakpointEventBody(BaseSchema):
             ]
         },
         "breakpoint": {
-            "description": "The breakpoint.",
+            "description": "The 'id' attribute is used to find the target breakpoint and the other attributes are used as the new values.",
             "type": "Breakpoint"
         }
     }
@@ -10776,7 +13862,7 @@ class BreakpointEventBody(BaseSchema):
     def __init__(self, reason, breakpoint, **kwargs):
         """
         :param string reason: The reason for the event.
-        :param Breakpoint breakpoint: The breakpoint.
+        :param Breakpoint breakpoint: The 'id' attribute is used to find the target breakpoint and the other attributes are used as the new values.
         """
         self.reason = reason
         if breakpoint is None:
@@ -10927,23 +14013,29 @@ class ProcessEventBody(BaseSchema):
                 "Debugger attached to an existing process.",
                 "A project launcher component has launched a new process in a suspended state and then asked the debugger to attach."
             ]
+        },
+        "pointerSize": {
+            "type": "integer",
+            "description": "The size of a pointer or address for this process, in bits. This value may be used by clients when formatting addresses for display."
         }
     }
     __refs__ = set()
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, name, systemProcessId=None, isLocalProcess=None, startMethod=None, **kwargs):
+    def __init__(self, name, systemProcessId=None, isLocalProcess=None, startMethod=None, pointerSize=None, **kwargs):
         """
         :param string name: The logical name of the process. This is usually the full path to process's executable file. Example: /home/example/myproj/program.js.
         :param integer systemProcessId: The system process id of the debugged process. This property will be missing for non-system processes.
         :param boolean isLocalProcess: If true, the process is running on the same computer as the debug adapter.
         :param string startMethod: Describes how the debug engine started debugging this process.
+        :param integer pointerSize: The size of a pointer or address for this process, in bits. This value may be used by clients when formatting addresses for display.
         """
         self.name = name
         self.systemProcessId = systemProcessId
         self.isLocalProcess = isLocalProcess
         self.startMethod = startMethod
+        self.pointerSize = pointerSize
         self.kwargs = kwargs
 
 
@@ -10957,6 +14049,8 @@ class ProcessEventBody(BaseSchema):
             dct['isLocalProcess'] = self.isLocalProcess
         if self.startMethod is not None:
             dct['startMethod'] = self.startMethod
+        if self.pointerSize is not None:
+            dct['pointerSize'] = self.pointerSize
         dct.update(self.kwargs)
         return dct
 
@@ -10999,6 +14093,176 @@ class CapabilitiesEventBody(BaseSchema):
 
 
 @register
+class ProgressStartEventBody(BaseSchema):
+    """
+    "body" of ProgressStartEvent
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "progressId": {
+            "type": "string",
+            "description": "An ID that must be used in subsequent 'progressUpdate' and 'progressEnd' events to make them refer to the same progress reporting.\nIDs must be unique within a debug session."
+        },
+        "title": {
+            "type": "string",
+            "description": "Mandatory (short) title of the progress reporting. Shown in the UI to describe the long running operation."
+        },
+        "requestId": {
+            "type": "number",
+            "description": "The request ID that this progress report is related to. If specified a debug adapter is expected to emit\nprogress events for the long running request until the request has been either completed or cancelled.\nIf the request ID is omitted, the progress report is assumed to be related to some general activity of the debug adapter."
+        },
+        "cancellable": {
+            "type": "boolean",
+            "description": "If true, the request that reports progress may be canceled with a 'cancel' request.\nSo this property basically controls whether the client should use UX that supports cancellation.\nClients that don't support cancellation are allowed to ignore the setting."
+        },
+        "message": {
+            "type": "string",
+            "description": "Optional, more detailed progress message."
+        },
+        "percentage": {
+            "type": "number",
+            "description": "Optional progress percentage to display (value range: 0 to 100). If omitted no percentage will be shown."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, progressId, title, requestId=None, cancellable=None, message=None, percentage=None, **kwargs):
+        """
+        :param string progressId: An ID that must be used in subsequent 'progressUpdate' and 'progressEnd' events to make them refer to the same progress reporting.
+        IDs must be unique within a debug session.
+        :param string title: Mandatory (short) title of the progress reporting. Shown in the UI to describe the long running operation.
+        :param number requestId: The request ID that this progress report is related to. If specified a debug adapter is expected to emit
+        progress events for the long running request until the request has been either completed or cancelled.
+        If the request ID is omitted, the progress report is assumed to be related to some general activity of the debug adapter.
+        :param boolean cancellable: If true, the request that reports progress may be canceled with a 'cancel' request.
+        So this property basically controls whether the client should use UX that supports cancellation.
+        Clients that don't support cancellation are allowed to ignore the setting.
+        :param string message: Optional, more detailed progress message.
+        :param number percentage: Optional progress percentage to display (value range: 0 to 100). If omitted no percentage will be shown.
+        """
+        self.progressId = progressId
+        self.title = title
+        self.requestId = requestId
+        self.cancellable = cancellable
+        self.message = message
+        self.percentage = percentage
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'progressId': self.progressId,
+             'title': self.title,
+        }
+        if self.requestId is not None:
+            dct['requestId'] = self.requestId
+        if self.cancellable is not None:
+            dct['cancellable'] = self.cancellable
+        if self.message is not None:
+            dct['message'] = self.message
+        if self.percentage is not None:
+            dct['percentage'] = self.percentage
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class ProgressUpdateEventBody(BaseSchema):
+    """
+    "body" of ProgressUpdateEvent
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "progressId": {
+            "type": "string",
+            "description": "The ID that was introduced in the initial 'progressStart' event."
+        },
+        "message": {
+            "type": "string",
+            "description": "Optional, more detailed progress message. If omitted, the previous message (if any) is used."
+        },
+        "percentage": {
+            "type": "number",
+            "description": "Optional progress percentage to display (value range: 0 to 100). If omitted no percentage will be shown."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, progressId, message=None, percentage=None, **kwargs):
+        """
+        :param string progressId: The ID that was introduced in the initial 'progressStart' event.
+        :param string message: Optional, more detailed progress message. If omitted, the previous message (if any) is used.
+        :param number percentage: Optional progress percentage to display (value range: 0 to 100). If omitted no percentage will be shown.
+        """
+        self.progressId = progressId
+        self.message = message
+        self.percentage = percentage
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'progressId': self.progressId,
+        }
+        if self.message is not None:
+            dct['message'] = self.message
+        if self.percentage is not None:
+            dct['percentage'] = self.percentage
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class ProgressEndEventBody(BaseSchema):
+    """
+    "body" of ProgressEndEvent
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "progressId": {
+            "type": "string",
+            "description": "The ID that was introduced in the initial 'ProgressStartEvent'."
+        },
+        "message": {
+            "type": "string",
+            "description": "Optional, more detailed progress message. If omitted, the previous message (if any) is used."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, progressId, message=None, **kwargs):
+        """
+        :param string progressId: The ID that was introduced in the initial 'ProgressStartEvent'.
+        :param string message: Optional, more detailed progress message. If omitted, the previous message (if any) is used.
+        """
+        self.progressId = progressId
+        self.message = message
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'progressId': self.progressId,
+        }
+        if self.message is not None:
+            dct['message'] = self.message
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
 class RunInTerminalRequestArgumentsEnv(BaseSchema):
     """
     "env" of RunInTerminalRequestArguments
@@ -11036,19 +14300,25 @@ class RunInTerminalResponseBody(BaseSchema):
 
     __props__ = {
         "processId": {
-            "type": "number",
-            "description": "The process ID."
+            "type": "integer",
+            "description": "The process ID. The value should be less than or equal to 2147483647 (2^31 - 1)."
+        },
+        "shellProcessId": {
+            "type": "integer",
+            "description": "The process ID of the terminal shell. The value should be less than or equal to 2147483647 (2^31 - 1)."
         }
     }
     __refs__ = set()
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, processId=None, **kwargs):
+    def __init__(self, processId=None, shellProcessId=None, **kwargs):
         """
-        :param number processId: The process ID.
+        :param integer processId: The process ID. The value should be less than or equal to 2147483647 (2^31 - 1).
+        :param integer shellProcessId: The process ID of the terminal shell. The value should be less than or equal to 2147483647 (2^31 - 1).
         """
         self.processId = processId
+        self.shellProcessId = shellProcessId
         self.kwargs = kwargs
 
 
@@ -11057,44 +14327,45 @@ class RunInTerminalResponseBody(BaseSchema):
         }
         if self.processId is not None:
             dct['processId'] = self.processId
+        if self.shellProcessId is not None:
+            dct['shellProcessId'] = self.shellProcessId
         dct.update(self.kwargs)
         return dct
 
 
 @register
-class ErrorResponseBody(BaseSchema):
+class BreakpointLocationsResponseBody(BaseSchema):
     """
-    "body" of ErrorResponse
+    "body" of BreakpointLocationsResponse
 
     Note: automatically generated code. Do not edit manually.
     """
 
     __props__ = {
-        "error": {
-            "description": "An optional, structured error message.",
-            "type": "Message"
+        "breakpoints": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/BreakpointLocation"
+            },
+            "description": "Sorted set of possible breakpoint locations."
         }
     }
-    __refs__ = {'error'}
+    __refs__ = set()
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, error=None, **kwargs):
+    def __init__(self, breakpoints, **kwargs):
         """
-        :param Message error: An optional, structured error message.
+        :param array breakpoints: Sorted set of possible breakpoint locations.
         """
-        if error is None:
-            self.error = Message()
-        else:
-            self.error = Message(**error) if error.__class__ !=  Message else error
+        self.breakpoints = breakpoints
         self.kwargs = kwargs
 
 
     def to_dict(self):
         dct = {
+             'breakpoints': self.breakpoints,
         }
-        if self.error is not None:
-            dct['error'] = self.error.to_dict()
         dct.update(self.kwargs)
         return dct
 
@@ -11113,7 +14384,7 @@ class SetBreakpointsResponseBody(BaseSchema):
             "items": {
                 "$ref": "#/definitions/Breakpoint"
             },
-            "description": "Information about the breakpoints. The array elements are in the same order as the elements of the 'breakpoints' (or the deprecated 'lines') in the SetBreakpointsArguments."
+            "description": "Information about the breakpoints.\nThe array elements are in the same order as the elements of the 'breakpoints' (or the deprecated 'lines') array in the arguments."
         }
     }
     __refs__ = set()
@@ -11122,7 +14393,8 @@ class SetBreakpointsResponseBody(BaseSchema):
 
     def __init__(self, breakpoints, **kwargs):
         """
-        :param array breakpoints: Information about the breakpoints. The array elements are in the same order as the elements of the 'breakpoints' (or the deprecated 'lines') in the SetBreakpointsArguments.
+        :param array breakpoints: Information about the breakpoints.
+        The array elements are in the same order as the elements of the 'breakpoints' (or the deprecated 'lines') array in the arguments.
         """
         self.breakpoints = breakpoints
         self.kwargs = kwargs
@@ -11174,6 +14446,143 @@ class SetFunctionBreakpointsResponseBody(BaseSchema):
 
 
 @register
+class DataBreakpointInfoResponseBody(BaseSchema):
+    """
+    "body" of DataBreakpointInfoResponse
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "dataId": {
+            "type": [
+                "string",
+                "null"
+            ],
+            "description": "An identifier for the data on which a data breakpoint can be registered with the setDataBreakpoints request or null if no data breakpoint is available."
+        },
+        "description": {
+            "type": "string",
+            "description": "UI string that describes on what data the breakpoint is set on or why a data breakpoint is not available."
+        },
+        "accessTypes": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/DataBreakpointAccessType"
+            },
+            "description": "Optional attribute listing the available access types for a potential data breakpoint. A UI frontend could surface this information."
+        },
+        "canPersist": {
+            "type": "boolean",
+            "description": "Optional attribute indicating that a potential data breakpoint could be persisted across sessions."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, dataId, description, accessTypes=None, canPersist=None, **kwargs):
+        """
+        :param ['string', 'null'] dataId: An identifier for the data on which a data breakpoint can be registered with the setDataBreakpoints request or null if no data breakpoint is available.
+        :param string description: UI string that describes on what data the breakpoint is set on or why a data breakpoint is not available.
+        :param array accessTypes: Optional attribute listing the available access types for a potential data breakpoint. A UI frontend could surface this information.
+        :param boolean canPersist: Optional attribute indicating that a potential data breakpoint could be persisted across sessions.
+        """
+        self.dataId = dataId
+        self.description = description
+        self.accessTypes = accessTypes
+        self.canPersist = canPersist
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'dataId': self.dataId,
+             'description': self.description,
+        }
+        if self.accessTypes is not None:
+            dct['accessTypes'] = self.accessTypes
+        if self.canPersist is not None:
+            dct['canPersist'] = self.canPersist
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class SetDataBreakpointsResponseBody(BaseSchema):
+    """
+    "body" of SetDataBreakpointsResponse
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "breakpoints": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/Breakpoint"
+            },
+            "description": "Information about the data breakpoints. The array elements correspond to the elements of the input argument 'breakpoints' array."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, breakpoints, **kwargs):
+        """
+        :param array breakpoints: Information about the data breakpoints. The array elements correspond to the elements of the input argument 'breakpoints' array.
+        """
+        self.breakpoints = breakpoints
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'breakpoints': self.breakpoints,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class SetInstructionBreakpointsResponseBody(BaseSchema):
+    """
+    "body" of SetInstructionBreakpointsResponse
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "breakpoints": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/Breakpoint"
+            },
+            "description": "Information about the breakpoints. The array elements correspond to the elements of the 'breakpoints' array."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, breakpoints, **kwargs):
+        """
+        :param array breakpoints: Information about the breakpoints. The array elements correspond to the elements of the 'breakpoints' array.
+        """
+        self.breakpoints = breakpoints
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'breakpoints': self.breakpoints,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
 class ContinueResponseBody(BaseSchema):
     """
     "body" of ContinueResponse
@@ -11184,7 +14593,7 @@ class ContinueResponseBody(BaseSchema):
     __props__ = {
         "allThreadsContinued": {
             "type": "boolean",
-            "description": "If true, the continue request has ignored the specified thread and continued all threads instead. If this attribute is missing a value of 'true' is assumed for backward compatibility."
+            "description": "If true, the 'continue' request has ignored the specified thread and continued all threads instead.\nIf this attribute is missing a value of 'true' is assumed for backward compatibility."
         }
     }
     __refs__ = set()
@@ -11193,7 +14602,8 @@ class ContinueResponseBody(BaseSchema):
 
     def __init__(self, allThreadsContinued=None, **kwargs):
         """
-        :param boolean allThreadsContinued: If true, the continue request has ignored the specified thread and continued all threads instead. If this attribute is missing a value of 'true' is assumed for backward compatibility.
+        :param boolean allThreadsContinued: If true, the 'continue' request has ignored the specified thread and continued all threads instead.
+        If this attribute is missing a value of 'true' is assumed for backward compatibility.
         """
         self.allThreadsContinued = allThreadsContinued
         self.kwargs = kwargs
@@ -11346,16 +14756,16 @@ class SetVariableResponseBody(BaseSchema):
             "description": "The type of the new value. Typically shown in the UI when hovering over the value."
         },
         "variablesReference": {
-            "type": "number",
-            "description": "If variablesReference is > 0, the new value is structured and its children can be retrieved by passing variablesReference to the VariablesRequest."
+            "type": "integer",
+            "description": "If variablesReference is > 0, the new value is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
         },
         "namedVariables": {
-            "type": "number",
-            "description": "The number of named child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks."
+            "type": "integer",
+            "description": "The number of named child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
         },
         "indexedVariables": {
-            "type": "number",
-            "description": "The number of indexed child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks."
+            "type": "integer",
+            "description": "The number of indexed child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
         }
     }
     __refs__ = set()
@@ -11366,11 +14776,14 @@ class SetVariableResponseBody(BaseSchema):
         """
         :param string value: The new value of the variable.
         :param string type: The type of the new value. Typically shown in the UI when hovering over the value.
-        :param number variablesReference: If variablesReference is > 0, the new value is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.
-        :param number namedVariables: The number of named child variables.
+        :param integer variablesReference: If variablesReference is > 0, the new value is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.
+        The value should be less than or equal to 2147483647 (2^31 - 1).
+        :param integer namedVariables: The number of named child variables.
         The client can use this optional information to present the variables in a paged UI and fetch them in chunks.
-        :param number indexedVariables: The number of indexed child variables.
+        The value should be less than or equal to 2147483647 (2^31 - 1).
+        :param integer indexedVariables: The number of indexed child variables.
         The client can use this optional information to present the variables in a paged UI and fetch them in chunks.
+        The value should be less than or equal to 2147483647 (2^31 - 1).
         """
         self.value = value
         self.type = type
@@ -11572,39 +14985,50 @@ class EvaluateResponseBody(BaseSchema):
         },
         "type": {
             "type": "string",
-            "description": "The optional type of the evaluate result."
+            "description": "The optional type of the evaluate result.\nThis attribute should only be returned by a debug adapter if the client has passed the value true for the 'supportsVariableType' capability of the 'initialize' request."
         },
         "presentationHint": {
             "description": "Properties of a evaluate result that can be used to determine how to render the result in the UI.",
             "type": "VariablePresentationHint"
         },
         "variablesReference": {
-            "type": "number",
-            "description": "If variablesReference is > 0, the evaluate result is structured and its children can be retrieved by passing variablesReference to the VariablesRequest."
+            "type": "integer",
+            "description": "If variablesReference is > 0, the evaluate result is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
         },
         "namedVariables": {
-            "type": "number",
-            "description": "The number of named child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks."
+            "type": "integer",
+            "description": "The number of named child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
         },
         "indexedVariables": {
-            "type": "number",
-            "description": "The number of indexed child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks."
+            "type": "integer",
+            "description": "The number of indexed child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
+        },
+        "memoryReference": {
+            "type": "string",
+            "description": "Optional memory reference to a location appropriate for this result.\nFor pointer type eval results, this is generally a reference to the memory address contained in the pointer.\nThis attribute should be returned by a debug adapter if the client has passed the value true for the 'supportsMemoryReferences' capability of the 'initialize' request."
         }
     }
     __refs__ = {'presentationHint'}
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, result, variablesReference, type=None, presentationHint=None, namedVariables=None, indexedVariables=None, **kwargs):
+    def __init__(self, result, variablesReference, type=None, presentationHint=None, namedVariables=None, indexedVariables=None, memoryReference=None, **kwargs):
         """
         :param string result: The result of the evaluate request.
-        :param number variablesReference: If variablesReference is > 0, the evaluate result is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.
+        :param integer variablesReference: If variablesReference is > 0, the evaluate result is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.
+        The value should be less than or equal to 2147483647 (2^31 - 1).
         :param string type: The optional type of the evaluate result.
+        This attribute should only be returned by a debug adapter if the client has passed the value true for the 'supportsVariableType' capability of the 'initialize' request.
         :param VariablePresentationHint presentationHint: Properties of a evaluate result that can be used to determine how to render the result in the UI.
-        :param number namedVariables: The number of named child variables.
+        :param integer namedVariables: The number of named child variables.
         The client can use this optional information to present the variables in a paged UI and fetch them in chunks.
-        :param number indexedVariables: The number of indexed child variables.
+        The value should be less than or equal to 2147483647 (2^31 - 1).
+        :param integer indexedVariables: The number of indexed child variables.
         The client can use this optional information to present the variables in a paged UI and fetch them in chunks.
+        The value should be less than or equal to 2147483647 (2^31 - 1).
+        :param string memoryReference: Optional memory reference to a location appropriate for this result.
+        For pointer type eval results, this is generally a reference to the memory address contained in the pointer.
+        This attribute should be returned by a debug adapter if the client has passed the value true for the 'supportsMemoryReferences' capability of the 'initialize' request.
         """
         self.result = result
         self.variablesReference = variablesReference
@@ -11615,6 +15039,7 @@ class EvaluateResponseBody(BaseSchema):
             self.presentationHint = VariablePresentationHint(**presentationHint) if presentationHint.__class__ !=  VariablePresentationHint else presentationHint
         self.namedVariables = namedVariables
         self.indexedVariables = indexedVariables
+        self.memoryReference = memoryReference
         self.kwargs = kwargs
 
 
@@ -11631,6 +15056,8 @@ class EvaluateResponseBody(BaseSchema):
             dct['namedVariables'] = self.namedVariables
         if self.indexedVariables is not None:
             dct['indexedVariables'] = self.indexedVariables
+        if self.memoryReference is not None:
+            dct['memoryReference'] = self.memoryReference
         dct.update(self.kwargs)
         return dct
 
@@ -11650,23 +15077,23 @@ class SetExpressionResponseBody(BaseSchema):
         },
         "type": {
             "type": "string",
-            "description": "The optional type of the value."
+            "description": "The optional type of the value.\nThis attribute should only be returned by a debug adapter if the client has passed the value true for the 'supportsVariableType' capability of the 'initialize' request."
         },
         "presentationHint": {
             "description": "Properties of a value that can be used to determine how to render the result in the UI.",
             "type": "VariablePresentationHint"
         },
         "variablesReference": {
-            "type": "number",
-            "description": "If variablesReference is > 0, the value is structured and its children can be retrieved by passing variablesReference to the VariablesRequest."
+            "type": "integer",
+            "description": "If variablesReference is > 0, the value is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
         },
         "namedVariables": {
-            "type": "number",
-            "description": "The number of named child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks."
+            "type": "integer",
+            "description": "The number of named child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
         },
         "indexedVariables": {
-            "type": "number",
-            "description": "The number of indexed child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks."
+            "type": "integer",
+            "description": "The number of indexed child variables.\nThe client can use this optional information to present the variables in a paged UI and fetch them in chunks.\nThe value should be less than or equal to 2147483647 (2^31 - 1)."
         }
     }
     __refs__ = {'presentationHint'}
@@ -11677,12 +15104,16 @@ class SetExpressionResponseBody(BaseSchema):
         """
         :param string value: The new value of the expression.
         :param string type: The optional type of the value.
+        This attribute should only be returned by a debug adapter if the client has passed the value true for the 'supportsVariableType' capability of the 'initialize' request.
         :param VariablePresentationHint presentationHint: Properties of a value that can be used to determine how to render the result in the UI.
-        :param number variablesReference: If variablesReference is > 0, the value is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.
-        :param number namedVariables: The number of named child variables.
+        :param integer variablesReference: If variablesReference is > 0, the value is structured and its children can be retrieved by passing variablesReference to the VariablesRequest.
+        The value should be less than or equal to 2147483647 (2^31 - 1).
+        :param integer namedVariables: The number of named child variables.
         The client can use this optional information to present the variables in a paged UI and fetch them in chunks.
-        :param number indexedVariables: The number of indexed child variables.
+        The value should be less than or equal to 2147483647 (2^31 - 1).
+        :param integer indexedVariables: The number of indexed child variables.
         The client can use this optional information to present the variables in a paged UI and fetch them in chunks.
+        The value should be less than or equal to 2147483647 (2^31 - 1).
         """
         self.value = value
         self.type = type
@@ -11884,6 +15315,95 @@ class ExceptionInfoResponseBody(BaseSchema):
             dct['description'] = self.description
         if self.details is not None:
             dct['details'] = self.details.to_dict()
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class ReadMemoryResponseBody(BaseSchema):
+    """
+    "body" of ReadMemoryResponse
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "address": {
+            "type": "string",
+            "description": "The address of the first byte of data returned.\nTreated as a hex value if prefixed with '0x', or as a decimal value otherwise."
+        },
+        "unreadableBytes": {
+            "type": "integer",
+            "description": "The number of unreadable bytes encountered after the last successfully read byte.\nThis can be used to determine the number of bytes that must be skipped before a subsequent 'readMemory' request will succeed."
+        },
+        "data": {
+            "type": "string",
+            "description": "The bytes read from memory, encoded using base64."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, address, unreadableBytes=None, data=None, **kwargs):
+        """
+        :param string address: The address of the first byte of data returned.
+        Treated as a hex value if prefixed with '0x', or as a decimal value otherwise.
+        :param integer unreadableBytes: The number of unreadable bytes encountered after the last successfully read byte.
+        This can be used to determine the number of bytes that must be skipped before a subsequent 'readMemory' request will succeed.
+        :param string data: The bytes read from memory, encoded using base64.
+        """
+        self.address = address
+        self.unreadableBytes = unreadableBytes
+        self.data = data
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'address': self.address,
+        }
+        if self.unreadableBytes is not None:
+            dct['unreadableBytes'] = self.unreadableBytes
+        if self.data is not None:
+            dct['data'] = self.data
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class DisassembleResponseBody(BaseSchema):
+    """
+    "body" of DisassembleResponse
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "instructions": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/DisassembledInstruction"
+            },
+            "description": "The list of disassembled instructions."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, instructions, **kwargs):
+        """
+        :param array instructions: The list of disassembled instructions.
+        """
+        self.instructions = instructions
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'instructions': self.instructions,
+        }
         dct.update(self.kwargs)
         return dct
 

@@ -414,7 +414,7 @@ class %(name)s(BaseSchema):
         contents.append(class_template % class_to_generate)
 
     parent_dir = os.path.dirname(os.path.dirname(__file__))
-    schema = os.path.join(parent_dir, 'debugger', 'debug_adapter', 'schema.py')
+    schema = os.path.join(parent_dir, 'debug_adapter', 'schema.py')
     with open(schema, 'w', encoding='utf-8') as stream:
         stream.write('\n'.join(contents))
 

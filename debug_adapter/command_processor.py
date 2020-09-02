@@ -12,6 +12,13 @@ import sys
 from queue import Queue
 from . import schema, base_schema, log
 from .tools import get_good_path, Measurement
+from .internal_classes import DaDevModes, DaRunState
+
+
+POST_MORTEM_MODE_NOTIFICATION = "---\n" \
+                                "Post-mortem mode! GDB functions changes state of the target are disabled.\n" \
+                                "If you want to send a GDB command type `-exec COMMAND` to the Debug Console\n" \
+                                "---\n"
 
 
 class CommandProcessor(object):
@@ -45,7 +52,7 @@ class CommandProcessor(object):
                     on_request(protocol_message)
                 else:
                     self._logger.warning('Unhandled: %s not available in CommandProcessor.' % (method_name, ))
-                self._logger.debug("Processed command: %s\n" % protocol_message.command)
+                self._logger.debug("Processed command: %s" % protocol_message.command)
         except Exception as e:
             log.debug_exception(e)
 
@@ -79,18 +86,61 @@ class CommandProcessor(object):
         """
         m = Measurement()
         self.da.adapter_init()
+        self.generate_OutputEvent("Debug Adapter initialized\n")
         # response
         response = base_schema.build_response(request)  # type: schema.InitializeResponse
-        response.body.supportsConfigurationDoneRequest = True
-        response.body.supportsSetVariable = True
-        response.body.supportsRestartRequest = True
-        response.body.supportTerminateDebuggee = True
-        response.body.supportsHitConditionalBreakpoints = True
-        response.body.supportsConditionalBreakpoints = True
+        if self.da.args.postmortem:
+            response.body.supportsConfigurationDoneRequest = True
+            response.body.supportsRestartRequest = True
+
+        else:
+            # Supported features
+            response.body.supportsConfigurationDoneRequest = True
+            response.body.supportsConditionalBreakpoints = True
+            response.body.supportsHitConditionalBreakpoints = True
+            response.body.supportsSetVariable = True
+            response.body.supportsRestartRequest = True
+            response.body.supportTerminateDebuggee = True
+            response.body.supportsStepInTargetsRequest = True
+            # Not supported features
+            response.body.supportsFunctionBreakpoints = False
+            response.body.supportsEvaluateForHovers = False
+            response.body.exceptionBreakpointFilters = False
+            response.body.supportsStepBack = False
+            response.body.supportsRestartFrame = False
+            response.body.supportsGotoTargetsRequest = False
+            response.body.supportsCompletionsRequest = False
+            response.body.completionTriggerCharacters = False
+            response.body.supportsModulesRequest = False
+            response.body.additionalModuleColumns = False
+            response.body.supportedChecksumAlgorithms = False
+            response.body.supportsExceptionOptions = False
+            response.body.supportsValueFormattingOptions = False
+            response.body.supportsExceptionInfoRequest = False
+            response.body.supportsDelayedStackTraceLoading = False
+            response.body.supportsLoadedSourcesRequest = False
+            response.body.supportsLogPoints = False
+            response.body.supportsTerminateThreadsRequest = False
+            response.body.supportsSetExpression = False
+            response.body.supportsTerminateRequest = False
+            response.body.supportsDataBreakpoints = False
+            response.body.supportsReadMemoryRequest = False
+            response.body.supportsDisassembleRequest = False
+            response.body.supportsCancelRequest = False
+            response.body.supportsBreakpointLocationsRequest = False
+            response.body.supportsClipboardContext = False
+            response.body.supportsSteppingGranularity = False
+            response.body.supportsInstructionBreakpoints = False
         self.write_message(response)
         # done event
         self.write_message(schema.InitializedEvent())
-        if self.da.is_connection_check_mode():
+        if self.da.args.postmortem:
+            self.da._gdb._target_state = 1
+            self.generate_StoppedEvent(reason="exception",
+                                       preserve_focus_hint=True,
+                                       all_threads_stopped=True,
+                                       thread_id=1)
+        if self.da.args.developer_mode == DaDevModes.CON_CHECK:
             self.generate_TerminatedEvent()
         m.stop_n_check(2)
 
@@ -100,10 +150,10 @@ class CommandProcessor(object):
         ----------
         request:schema.LaunchRequest
         """
-        if self.da.is_connection_check_mode():
+        if self.da.args.developer_mode == DaDevModes.CON_CHECK:
             return
-        r_args = request.arguments.to_dict()
-        self.da.state.no_debug = r_args.get('noDebug')
+        # r_args = request.arguments.to_dict()
+        self.da.state.no_debug = False  # BUG: r_args.get('noDebug') is always True coming from the extension !!!
         try:
             self.da.run(start=(not self.da.state.no_debug))
             success = True
@@ -113,6 +163,10 @@ class CommandProcessor(object):
         launch_response = base_schema.build_response(request)
         launch_response.success = success
         self.write_message(launch_response)  # acknowledge it
+        if success:
+            self.generate_OutputEvent("Debug Adapter is running\n")
+        else:
+            self.generate_OutputEvent("Debug Adapter is not running\n")
 
     def on_configurationDone_request(self, request):
         """
@@ -120,7 +174,7 @@ class CommandProcessor(object):
         ----------
         request:schema.ConfigurationDoneRequest
         """
-        self.da.state.configured_by_client = True
+        self.da.state.run_state = DaRunState.CONFIGURED
         configuration_done_response = base_schema.build_response(request)
         self.write_message(configuration_done_response)  # acknowledge it
         if self.da.state.no_debug:
@@ -165,20 +219,17 @@ class CommandProcessor(object):
         ----------
         request : schema.ContinueRequest
         """
-        # reading:
-        # thread_id = request.arguments.threadId
-        self.da.resume_exec()
-        all = True
-        # response:
-        kwargs = {'body': schema.ContinueResponseBody(allThreadsContinued=all)}
-        continue_response = base_schema.build_response(request, kwargs)
-        self.write_message(continue_response)
-        # # sending a stop for every thread (cause all_threads_stopped=True sometimes not works)
-        # stop_state = self.da.is_stopped()  # bool, reason_str
-        # if stop_state[0]:
-        #     self.generate_StoppedEvent(reason=stop_state[1],
-        #                                thread_id=thread_id,
-        #                                all_threads_stopped=all)
+        if self.da.args.postmortem:
+            kwargs = {'body': schema.ContinueResponseBody()}
+            response = base_schema.build_response(request, kwargs)
+            response.success = False
+            self.write_message(response)
+            self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
+        else:
+            self.da.resume_exec()
+            kwargs = {'body': schema.ContinueResponseBody(allThreadsContinued=True)}
+            response = base_schema.build_response(request, kwargs)
+            self.write_message(response)
 
     def generate_StoppedEvent(self, reason, thread_id, all_threads_stopped=None, preserve_focus_hint=None):
         """
@@ -196,6 +247,50 @@ class CommandProcessor(object):
                                        allThreadsStopped=all_threads_stopped,
                                        preserveFocusHint=preserve_focus_hint)
         event = schema.StoppedEvent(body)
+        self.write_message(event)
+
+    def generate_OutputEvent(self, output, category=None, group=None, variablesReference=None, source=None, line=None,
+                             column=None, data=None):
+        """
+        Parameters
+        ----------
+        output:str
+            The output to report.
+        category:str
+            The output category. If not specified, 'console' is assumed.
+            Values: 'console', 'stdout', 'stderr', 'telemetry', etc.
+        group:str
+            Support for keeping an output log organized by grouping related messages.
+
+            'start': Start a new group in expanded mode. Subsequent output events are members of the group and should be
+            shown indented.
+            The 'output' attribute becomes the name of the group and is not indented.
+
+            'startCollapsed': Start a new group in collapsed mode. Subsequent output events are members of the group and
+             should be shown indented (as soon as the group is expanded).
+            The 'output' attribute becomes the name of the group and is not indented.
+
+            'end': End the current group and decreases the indentation of subsequent output events.
+            A non empty 'output' attribute is shown as the unindented end of the group.
+
+        variablesReference: int
+            If an attribute 'variablesReference' exists and its value is > 0, the output contains objects which can be
+            retrieved by passing 'variablesReference' to the 'variables' request. The value should be less than or equal
+            to 2147483647 (2^31 - 1).
+        source: schema.Source
+            An optional source location where the output was produced.
+        line: int
+            An optional source location line where the output was produced.
+        column: int
+            An optional source location column where the output was produced.
+        data:
+            Optional data to report. For the 'telemetry' category the data will be sent to telemetry, for the other
+            categories the data is shown in JSON format.
+
+        """
+        body = schema.OutputEventBody(output=output, category=category, variablesReference=variablesReference,
+                                      source=source, line=line, column=column, data=data)
+        event = schema.OutputEvent(body)
         self.write_message(event)
 
     def generate_ContinuedEvent(self, thread_id, all_threads_continued=None):
@@ -244,7 +339,7 @@ class CommandProcessor(object):
                 _thr_list.append(thread_obj.to_dict())
             return _thr_list
 
-        if self.da.is_connection_check_mode():
+        if self.da.args.developer_mode == DaDevModes.CON_CHECK:
             return
         # === working:
         try:
@@ -266,9 +361,13 @@ class CommandProcessor(object):
         threads_response.message = message
         self.write_message(threads_response)
         self.da.threads_analysis()
+        if self.da.thread_selected is not None:
+            selected_num = self.da.thread_selected
+        else:
+            selected_num = 0
         if self.da.state.threads_are_stopped:
             self.generate_StoppedEvent(reason='breakpoint',
-                                       thread_id=int(self.da.threads[0]['id']),
+                                       thread_id=int(self.da.threads[selected_num - 1]['id']),
                                        all_threads_stopped=True)
         self.da.state.threads_are_stopped = None
 
@@ -293,17 +392,12 @@ class CommandProcessor(object):
                 name = frame.get('addr')
             else:
                 name = frame.get('func')
-            sf = schema.StackFrame(
-                id=self.da.frame_id_generate(thread_id, frame['level']),
-                name=name,
-                line=line,
-                column=0,
-                source=src,
-                # endLine=None,
-                # endColumn=None,
-                # moduleId=None,
-                # presentationHint=None
-            )
+            sf = schema.StackFrame(id=self.da.frame_id_generate(thread_id, frame['level']),
+                                   name=name,
+                                   line=line,
+                                   column=0,
+                                   source=src,
+                                   )
             stack_frames_list.append(sf.to_dict())  # to_dict because of a json encoding error
         kwargs = {
             'body': schema.StackTraceResponseBody(stackFrames=stack_frames_list, totalFrames=len(stack_frames_list))
@@ -324,7 +418,6 @@ class CommandProcessor(object):
         for scope in scopes:
             scope_dap_obj = schema.Scope(
                 name=scope['name'],
-                # variablesReference=len(scope['vals_list']),
                 variablesReference=len(scope['vals_list']),
                 expensive=False)
             scopes_for_body.append(scope_dap_obj.to_dict())
@@ -349,14 +442,18 @@ class CommandProcessor(object):
         ----------
         request:schema.SetVariableRequest
         """
-        # reading:
-        name = request.arguments.name
-        value = request.arguments.value
-        self.da.set_variable(name, value)
-        response = base_schema.build_response(request, kwargs={'body': {
-            'value': value
-        }})  # type: schema.SetVariableResponse
-        self.write_message(response)
+        if self.da.args.postmortem:
+            response = base_schema.build_response(request)
+            response.success = False
+            self.write_message(response)
+            self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
+        else:
+            name = request.arguments.name
+            value = request.arguments.value
+            self.da.set_variable(name, value)
+            response = base_schema.build_response(request, kwargs={
+                'body': {'value': value}})  # type: schema.SetVariableResponse
+            self.write_message(response)
 
     def on_evaluate_request(self, request):
         """
@@ -371,13 +468,27 @@ class CommandProcessor(object):
         except AttributeError:
             frame_id = None
         self.da.select_frame(frame_id)
-        result = self.da.evaluate(expression)  # no symbol and other errors processing
-        evaluate_response = base_schema.build_response(
-            request, kwargs={'body': {
-                'result': str(result),
-                'variablesReference': 0
-            }})
+        # on_evaluate_request can execute gdb command if the evaluation expression started with `-exec`
+        if len(expression) > 6 and expression[:6] == "-exec ":
+            cmd_output = ''
+
+            def get_output(output):
+                nonlocal cmd_output
+                cmd_output += output
+
+            self.da._gdb.stream_handler_set('console', get_output)
+            self.da.gdb_execute(expression[6:])
+            evaluate_response = base_schema.build_response(request, kwargs={
+                'body': {'result': cmd_output.replace("\\n", "\n"), 'variablesReference': 0}})
+
+        # if the expression did't start with  `-exec` do the evaluate command
+        else:
+            result = self.da.evaluate(expression)  # no symbol and other errors processing
+            evaluate_response = base_schema.build_response(request, kwargs={
+                'body': {'result': str(result), 'variablesReference': 0}})
         self.write_message(evaluate_response)
+        self.generate_OutputEvent(output="WARNING! This feature can't update UI after execution.",
+                                  category="console")
 
     def on_setExpression_request(self, request):
         """
@@ -433,6 +544,7 @@ class CommandProcessor(object):
         restart = r_args.get('restart')
         # doing
         disconnect_response = base_schema.build_response(request)
+        self.generate_OutputEvent("Debug Adapter stopped\n")
         self.da.adapter_stop()
         self.write_message(disconnect_response)
         if not restart:
@@ -444,11 +556,18 @@ class CommandProcessor(object):
         ----------
         request:schema.PauseRequest
         """
-        thread_id = request.arguments.threadId
-        pause_response = base_schema.build_response(request)
-        self.da.pause()
-        self.write_message(pause_response)
-        self.generate_StoppedEvent(reason='pause', thread_id=int(thread_id), all_threads_stopped=True)
+        response = base_schema.build_response(request)
+        if self.da.args.postmortem:
+            response.success = False
+            self.write_message(response)
+            self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
+        else:
+            thread_id = request.arguments.threadId
+            self.da.pause()
+            self.write_message(response)
+            self.generate_StoppedEvent(reason='pause',
+                                       thread_id=int(thread_id),
+                                       all_threads_stopped=True)
 
     def generate_BreakpointEvent(self, reason, bp):
         """
@@ -464,32 +583,49 @@ class CommandProcessor(object):
         self.write_message(event)
 
     def on_setBreakpoints_request(self, request):
+        def try_set_once(source_path, line, condition):
+            try:
+                return self.da.break_add("%s:%s" % (source_path, line), condition=condition)
+            except Exception as e:
+                raise e
         """
         Parameters
         ----------
         request: schems.SetBreakpointsRequest
         """
-        # TODO add logpoints
-        bps = request.arguments.breakpoints  # type: list[dict]
-        source = request.arguments.source
-        self.da.break_removeall()  # clear old ones
-        try:
+        if self.da.args.postmortem:
+            kwargs = {'body': schema.SetBreakpointsResponseBody([])}
+            response = base_schema.build_response(request, kwargs)
+            response.success = False
+            self.write_message(response)
+            self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
+        else:
+            # TODO add logpoints
+            bps = request.arguments.breakpoints  # type: list[dict]
+            source = request.arguments.source
+            self.da.break_removeall()  # clear old ones
+
             for bp in bps:
                 src_line = bp.get('line')
                 condition = bp.get("condition", '')
                 bp.update({'verified': 'true'})
                 bp.update({'source': source.to_dict()})
-                self.da.break_add(get_good_path(source.path) + ":" + str(src_line),
-                                  condition=condition)  # TODO add a condition syntax error processing
-            kwargs = {'body': schema.SetBreakpointsResponseBody(bps)}
-            success = True
-        except Exception as e:
-            log.debug_exception(e)
-            kwargs = {'body': schema.SetBreakpointsResponseBody([])}
-            success = False
-        response = base_schema.build_response(request, kwargs)
-        response.success = success
-        self.write_message(response)
+                try_count = 5
+                while try_count:
+                    try_count -= 1
+                    try:
+                        try_set_once(get_good_path(source.path), src_line, condition)
+                        kwargs = {'body': schema.SetBreakpointsResponseBody(bps)}
+                        success = True
+                        break
+                    except Exception as e:
+                        log.debug_exception(e)
+                        kwargs = {'body': schema.SetBreakpointsResponseBody([])}
+                        success = False
+
+            response = base_schema.build_response(request, kwargs)
+            response.success = success
+            self.write_message(response)
 
     def on_setExceptionBreakpoints_request(self, request):
         """
@@ -498,7 +634,12 @@ class CommandProcessor(object):
         request:schema.SetExpressionRequest
         """
         response = base_schema.build_response(request)
-        self.write_message(response)
+        if self.da.args.postmortem:
+            response.success = False
+            self.write_message(response)
+            self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
+        else:
+            self.write_message(response)
 
     def on_next_request(self, request):
         """
@@ -510,13 +651,20 @@ class CommandProcessor(object):
         thread_id = request.arguments.threadId
 
         response = base_schema.build_response(request)
-        result = self.da.step()
-        response.success = result
-        self.write_message(response)
+        if self.da.args.postmortem:
+            response.success = False
+            self.write_message(response)
+            self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
 
-        if result:
-            self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
-        m.stop_n_check(0.5, "The step operation took too long")
+        else:
+            result = self.da.step()
+            response.success = result
+            self.write_message(response)
+            if result:
+                self.generate_StoppedEvent(reason='step',
+                                           thread_id=thread_id,
+                                           all_threads_stopped=True)
+            m.stop_n_check(0.5, "The step operation took too long")
 
     def on_stepIn_request(self, request):
         """
@@ -524,15 +672,21 @@ class CommandProcessor(object):
         ----------
         request:schema.StepInRequest
         """
-        thread_id = request.arguments.threadId
 
         response = base_schema.build_response(request)
-        result = self.da.step_in()
-        response.success = result
-        self.write_message(response)
-
-        if result:
-            self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
+        if self.da.args.postmortem:
+            response.success = False
+            self.write_message(response)
+            self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
+        else:
+            thread_id = request.arguments.threadId
+            result = self.da.step_in()
+            response.success = result
+            self.write_message(response)
+            if result:
+                self.generate_StoppedEvent(reason='step',
+                                           thread_id=thread_id,
+                                           all_threads_stopped=True)
 
     def on_stepOut_request(self, request):
         """
@@ -540,15 +694,21 @@ class CommandProcessor(object):
         ----------
         request:schema.StepOutRequest
         """
-        thread_id = request.arguments.threadId
 
         response = base_schema.build_response(request)
-        result = self.da.step_out()
-        response.success = result
-        self.write_message(response)
-
-        if result:
-            self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
+        if self.da.args.postmortem:
+            response.success = False
+            self.write_message(response)
+            self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
+        else:
+            thread_id = request.arguments.threadId
+            result = self.da.step_out()
+            response.success = result
+            self.write_message(response)
+            if result:
+                self.generate_StoppedEvent(reason='step',
+                                           thread_id=thread_id,
+                                           all_threads_stopped=True)
 
     def write_message(self, protocol_message):
         """

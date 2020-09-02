@@ -1,6 +1,6 @@
 click
 psutil>=5.5.1
-pygdbmi>=0.9.0.0
+pygdbmi<=0.9.0.2
 requests>=2.21.0
 typing>=3.6.6
 xmlrunner>=1.7.7
