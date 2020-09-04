@@ -1,3 +1,0 @@
-[submodule "debug_adapter/debug_backend"]
-	path = debug_adapter/debug_backend
-	url = ../../espressif/py_debug_backend.git
