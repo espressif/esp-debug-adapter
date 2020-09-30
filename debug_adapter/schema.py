@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Note: automatically generated code. Do not edit manually.
 from .base_schema import BaseSchema, register, register_request, register_response
 
@@ -1904,6 +1905,92 @@ class ProgressEndEvent(BaseSchema):
         return dct
 
 
+@register
+class InvalidatedEvent(BaseSchema):
+    """
+    This event signals that some state in the debug adapter has changed and requires that the client
+    needs to re-render the data snapshot previously requested.
+    
+    Debug adapters do not have to emit this event for runtime changes like stopped or thread events
+    because in that case the client refetches the new state anyway. But the event can be used for
+    example to refresh the UI after rendering formatting has changed in the debug adapter.
+    
+    This event should only be sent if the debug adapter has received a value true for the
+    'supportsInvalidatedEvent' capability of the 'initialize' request.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "seq": {
+            "type": "integer",
+            "description": "Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request."
+        },
+        "type": {
+            "type": "string",
+            "enum": [
+                "event"
+            ]
+        },
+        "event": {
+            "type": "string",
+            "enum": [
+                "invalidated"
+            ]
+        },
+        "body": {
+            "type": "object",
+            "properties": {
+                "areas": {
+                    "type": "array",
+                    "description": "Optional set of logical areas that got invalidated. This property has a hint characteristic: a client can only be expected to make a 'best effort' in honouring the areas but there are no guarantees. If this property is missing, empty, or if values are not understand the client should assume a single value 'all'.",
+                    "items": {
+                        "$ref": "#/definitions/InvalidatedAreas"
+                    }
+                },
+                "threadId": {
+                    "type": "number",
+                    "description": "If specified, the client only needs to refetch data related to this thread."
+                },
+                "stackFrameId": {
+                    "type": "number",
+                    "description": "If specified, the client only needs to refetch data related to this stack frame (and the 'threadId' is ignored)."
+                }
+            }
+        }
+    }
+    __refs__ = {'body'}
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, body, seq=-1, **kwargs):
+        """
+        :param string type: 
+        :param string event: 
+        :param InvalidatedEventBody body: 
+        :param integer seq: Sequence number (also known as message ID). For protocol messages of type 'request' this ID can be used to cancel the request.
+        """
+        self.type = 'event'
+        self.event = 'invalidated'
+        if body is None:
+            self.body = InvalidatedEventBody()
+        else:
+            self.body = InvalidatedEventBody(**body) if body.__class__ !=  InvalidatedEventBody else body
+        self.seq = seq
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+             'type': self.type,
+             'event': self.event,
+             'body': self.body.to_dict(),
+             'seq': self.seq,
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
 @register_request('runInTerminal')
 @register
 class RunInTerminalRequest(BaseSchema):
@@ -2288,13 +2375,17 @@ class InitializeRequestArguments(BaseSchema):
         "supportsProgressReporting": {
             "type": "boolean",
             "description": "Client supports progress reporting."
+        },
+        "supportsInvalidatedEvent": {
+            "type": "boolean",
+            "description": "Client supports the invalidated event."
         }
     }
     __refs__ = set()
 
     __slots__ = list(__props__.keys()) + ['kwargs']
 
-    def __init__(self, adapterID, clientID=None, clientName=None, locale=None, linesStartAt1=None, columnsStartAt1=None, pathFormat=None, supportsVariableType=None, supportsVariablePaging=None, supportsRunInTerminalRequest=None, supportsMemoryReferences=None, supportsProgressReporting=None, **kwargs):
+    def __init__(self, adapterID, clientID=None, clientName=None, locale=None, linesStartAt1=None, columnsStartAt1=None, pathFormat=None, supportsVariableType=None, supportsVariablePaging=None, supportsRunInTerminalRequest=None, supportsMemoryReferences=None, supportsProgressReporting=None, supportsInvalidatedEvent=None, **kwargs):
         """
         :param string adapterID: The ID of the debug adapter.
         :param string clientID: The ID of the (frontend) client using this adapter.
@@ -2308,6 +2399,7 @@ class InitializeRequestArguments(BaseSchema):
         :param boolean supportsRunInTerminalRequest: Client supports the runInTerminal request.
         :param boolean supportsMemoryReferences: Client supports memory references.
         :param boolean supportsProgressReporting: Client supports progress reporting.
+        :param boolean supportsInvalidatedEvent: Client supports the invalidated event.
         """
         self.adapterID = adapterID
         self.clientID = clientID
@@ -2321,6 +2413,7 @@ class InitializeRequestArguments(BaseSchema):
         self.supportsRunInTerminalRequest = supportsRunInTerminalRequest
         self.supportsMemoryReferences = supportsMemoryReferences
         self.supportsProgressReporting = supportsProgressReporting
+        self.supportsInvalidatedEvent = supportsInvalidatedEvent
         self.kwargs = kwargs
 
 
@@ -2350,6 +2443,8 @@ class InitializeRequestArguments(BaseSchema):
             dct['supportsMemoryReferences'] = self.supportsMemoryReferences
         if self.supportsProgressReporting is not None:
             dct['supportsProgressReporting'] = self.supportsProgressReporting
+        if self.supportsInvalidatedEvent is not None:
+            dct['supportsInvalidatedEvent'] = self.supportsInvalidatedEvent
         dct.update(self.kwargs)
         return dct
 
@@ -13425,6 +13520,34 @@ class DisassembledInstruction(BaseSchema):
 
 
 @register
+class InvalidatedAreas(BaseSchema):
+    """
+    Logical areas that can be invalidated by the 'invalidated' event.
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {}
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, **kwargs):
+        """
+    
+        """
+    
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+        }
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
 class ErrorResponseBody(BaseSchema):
     """
     "body" of ErrorResponse
@@ -14258,6 +14381,60 @@ class ProgressEndEventBody(BaseSchema):
         }
         if self.message is not None:
             dct['message'] = self.message
+        dct.update(self.kwargs)
+        return dct
+
+
+@register
+class InvalidatedEventBody(BaseSchema):
+    """
+    "body" of InvalidatedEvent
+
+    Note: automatically generated code. Do not edit manually.
+    """
+
+    __props__ = {
+        "areas": {
+            "type": "array",
+            "description": "Optional set of logical areas that got invalidated. This property has a hint characteristic: a client can only be expected to make a 'best effort' in honouring the areas but there are no guarantees. If this property is missing, empty, or if values are not understand the client should assume a single value 'all'.",
+            "items": {
+                "$ref": "#/definitions/InvalidatedAreas"
+            }
+        },
+        "threadId": {
+            "type": "number",
+            "description": "If specified, the client only needs to refetch data related to this thread."
+        },
+        "stackFrameId": {
+            "type": "number",
+            "description": "If specified, the client only needs to refetch data related to this stack frame (and the 'threadId' is ignored)."
+        }
+    }
+    __refs__ = set()
+
+    __slots__ = list(__props__.keys()) + ['kwargs']
+
+    def __init__(self, areas=None, threadId=None, stackFrameId=None, **kwargs):
+        """
+        :param array areas: Optional set of logical areas that got invalidated. This property has a hint characteristic: a client can only be expected to make a 'best effort' in honouring the areas but there are no guarantees. If this property is missing, empty, or if values are not understand the client should assume a single value 'all'.
+        :param number threadId: If specified, the client only needs to refetch data related to this thread.
+        :param number stackFrameId: If specified, the client only needs to refetch data related to this stack frame (and the 'threadId' is ignored).
+        """
+        self.areas = areas
+        self.threadId = threadId
+        self.stackFrameId = stackFrameId
+        self.kwargs = kwargs
+
+
+    def to_dict(self):
+        dct = {
+        }
+        if self.areas is not None:
+            dct['areas'] = self.areas
+        if self.threadId is not None:
+            dct['threadId'] = self.threadId
+        if self.stackFrameId is not None:
+            dct['stackFrameId'] = self.stackFrameId
         dct.update(self.kwargs)
         return dct
 
