@@ -1,6 +1,7 @@
 click
 psutil>=5.5.1
 pygdbmi<=0.9.0.2
+pywin32>=227; sys.platform == 'win32'
 requests>=2.21.0
 typing>=3.6.6
 xmlrunner>=1.7.7
