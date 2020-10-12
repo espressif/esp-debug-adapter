@@ -364,6 +364,22 @@ def update_class_to_generate_objects(classes_to_generate, class_to_generate):
             val.pop('properties', None)
 
 
+def prepend_encoding(filename, encoding):
+    with open(filename, 'r+') as f:
+        content = f.read()
+        f.seek(0, 0)
+        f.write("# -*- coding: %s -*-\n" % encoding + content)
+
+
+def clean():
+    import os
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    try:
+        os.remove(os.path.join(script_dir, "debugProtocol.json"))
+    except FileNotFoundError:
+        pass
+
+
 def gen_debugger_protocol():
     import os.path
     import sys
@@ -417,6 +433,9 @@ class %(name)s(BaseSchema):
     schema = os.path.join(parent_dir, 'debug_adapter', 'schema.py')
     with open(schema, 'w', encoding='utf-8') as stream:
         stream.write('\n'.join(contents))
+    prepend_encoding(schema, "utf-8")
+    clean()
+
 
 
 def _indent_lines(lines, indent='    '):

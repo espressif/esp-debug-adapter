@@ -499,7 +499,8 @@ class DebugAdapter:
                     self._gdb.exec_file_core_set(core)
                 if self.args.cmdfile:
                     self._gdb.set_prog_startup_script(self.args.cmdfile)
-                self._gdb.connect()
+                if not self.args.postmortem:
+                    self._gdb.connect()
             except Exception as e:
                 raise e
         self.state.gdb_started = True
