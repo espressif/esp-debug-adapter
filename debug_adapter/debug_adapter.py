@@ -470,7 +470,7 @@ class DebugAdapter:
         """
         return self._oocd is not None
 
-    def start_gdb(self):
+    def start_gdb(self):  # noqa: C901
         """
         Starting GDB and write the result into state.gdb_started attribute
         """
@@ -501,6 +501,7 @@ class DebugAdapter:
                     self._gdb.set_prog_startup_script(self.args.cmdfile)
                 if not self.args.postmortem:
                     self._gdb.connect()
+                self._gdb.app_flash_offset = self.args.app_flash_off
             except Exception as e:
                 raise e
         self.state.gdb_started = True

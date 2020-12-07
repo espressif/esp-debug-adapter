@@ -25,6 +25,11 @@
 from enum import IntEnum
 from . import debug_backend as dbg
 
+# `typing` is used for provide Python2-compatible typing hint for IDEs like PyCharm.
+# Some  other tools like flake8, language server of VSCode - Pylance  do not sopport it
+# and can consider imports unused. To bypass the warning message `noqa` comment is used.
+from typing import Tuple, Union  # noqa: F401
+
 
 class Modes(object):
     def __init__(self, modes_list=[]):
@@ -76,10 +81,10 @@ class DaStates(object):
     ocd_started = False
     wait_target_state = dbg.TARGET_STATE_UNKNOWN
     threads_updated = False  # True if something called a get_threads() method
-    threads_are_stopped = None  # type: bool or None
+    threads_are_stopped = None  # type: Union[bool, None]
     # sets to False after the update processed (for example, stopEvent generated)
     error = False
-    start_time = None  # type: str
+    start_time = None  # type: Union[str, None]
 
 
 class DaArgs(object):
@@ -95,23 +100,24 @@ class DaArgs(object):
 
         Parameters
         ----------
-        app_flash_off:int
-        board_type:str
-        debug:int
-        developer_mode: str or None
-        device_name:str
-        elfpath:tuple
-        log_file:str
-        log_mult_files:bool
-        oocd:str
-        oocd_args:str
-        oocd_ip:str
-        oocd_mode:str
-        oocd_scripts:str
-        port:int
-        toolchain_prefix:str
-        cmdfile:str
-        core_file: tuple
+        app_flash_off: Union[int, None]
+        board_type: str
+        debug: int
+        developer_mode: Union[str, None]
+        device_name: str
+        elfpath: Tuple[str]
+        log_file: str
+        log_mult_files: bool
+        oocd: str
+        oocd_args: str
+        oocd_ip: str
+        oocd_mode: str
+        oocd_scripts: str
+        port: int
+        postmortem: bool
+        toolchain_prefix: str
+        cmdfile: str
+        core_file: Tuple[str]
         """
         self.app_flash_off = app_flash_off
         self.board_type = board_type
