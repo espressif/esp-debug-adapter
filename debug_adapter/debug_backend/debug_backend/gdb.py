@@ -52,7 +52,7 @@ class Gdb(object):
         self._resp_cache = []
         self._target_state = TARGET_STATE_UNKNOWN
         self._target_stop_reason = TARGET_STOP_REASON_UNKNOWN
-        self.stream_handlers = {'console': None, 'target': None, 'log': None}
+        self.stream_handlers = {'console': [], 'target': [], 'log': []}
         self._curr_frame = None
         self._curr_wp_val = None
         # gdb config
@@ -108,16 +108,16 @@ class Gdb(object):
             processed_recs += 1
             if rec['type'] == 'log':
                 self._logger.debug('LOG: %s', pformat(rec['payload']))
-                if self.stream_handlers['log']:
-                    self.stream_handlers['log'](rec['payload'])
+                for hnd in self.stream_handlers['log']:
+                    hnd(rec['type'], rec['stream'], rec['payload'])
             elif rec['type'] == 'console':
                 self._logger.info('CONS: %s', pformat(rec['payload']))
-                if self.stream_handlers['console']:
-                    self.stream_handlers['console'](rec['payload'])
+                for hnd in self.stream_handlers['console']:
+                    hnd(rec['type'], rec['stream'], rec['payload'])
             elif rec['type'] == 'target':
                 self._logger.debug('TGT: %s', pformat(rec['payload']))
-                if self.stream_handlers['target']:
-                    self.stream_handlers['target'](rec['payload'])
+                for hnd in self.stream_handlers['target']:
+                    hnd(rec['type'], rec['stream'], rec['payload'])
             elif rec['type'] == 'notify':
                 self._logger.info('NOTIFY: %s %s', rec['message'], pformat(rec['payload']))
                 self._on_notify(rec)
@@ -184,10 +184,19 @@ class Gdb(object):
                     res, res_body = self._parse_mi_resp(response, new_target_state)  # None, None if empty
         return res, res_body
 
-    def stream_handler_set(self, stream_type, handler):
+    def stream_handler_add(self, stream_type, handler):
         if stream_type not in self.stream_handlers:
             raise DebuggerError('Unsupported stream type "%s"' % stream_type)
-        self.stream_handlers[stream_type] = handler
+        if handler in self.stream_handlers[stream_type]:
+            return
+        self.stream_handlers[stream_type].append(handler)
+
+    def stream_handler_remove(self, stream_type, handler):
+        if stream_type not in self.stream_handlers:
+            raise DebuggerError('Unsupported stream type "%s"' % stream_type)
+        if handler not in self.stream_handlers[stream_type]:
+            return
+        self.stream_handlers[stream_type].remove(handler)
 
     def gdb_exit(self, tmo=5):
         """ -gdb-exit ~= quit """
@@ -353,6 +362,26 @@ class Gdb(object):
         # for PC we'll get something like '0x400e0db8 <gpio_set_direction>'
         return self.extract_exec_addr(sval)
 
+    def set_reg(self, nm, val):
+        return self.data_eval_expr('$%s=%s' % (nm, str(val)))
+
+    def get_reg_names(self, reg_no=[]):
+        # -data-list-register-names [ ( regno )+ ]
+        res, res_body = self._mi_cmd_run('-data-list-register-names %s' % ' '.join(str(x) for x in reg_no))
+        if res == "done" and 'register-names' in res_body:
+            return res_body['register-names']
+        else:
+            raise DebuggerError('Failed to get registers names!')
+
+    def get_reg_values(self, fmt, skip_unavailable=False, reg_no=[]):
+        #  -data-list-register-values [ --skip-unavailable ] fmt [ ( regno )*]
+        res, res_body = self._mi_cmd_run('-data-list-register-values %s %s %s' % \
+                                        ('--skip-unavailable' if skip_unavailable else '', fmt, ' '.join(str(x) for x in reg_no)))
+        if res == "done" and 'register-values' in res_body:
+            return res_body['register-values']
+        else:
+            raise DebuggerError('Failed to get registers values!')
+
     def gdb_set(self, var, val):
         res, _ = self._mi_cmd_run("-gdb-set %s %s" % (var, val))
         if res != "done":
@@ -436,11 +465,20 @@ class Gdb(object):
         if res != 'done':
             raise DebuggerError('Failed to delete BP!')
 
-    def monitor_run(self, cmd, tmo=None):
-        res, resp = self._mi_cmd_run('mon %s' % cmd, tmo=tmo)
+    def monitor_run(self, cmd, tmo=None, output_type=None):
+        target_output = ''
+        def _target_stream_handler(type, stream, payload):
+            nonlocal target_output
+            if output_type == 'any' or stream == output_type:
+                target_output += payload
+        self.stream_handler_add('target', _target_stream_handler)
+        try:
+            res, resp = self._mi_cmd_run('mon %s' % cmd, tmo=tmo)
+        finally:
+            self.stream_handler_remove('target', _target_stream_handler)
         if res != 'done':
             raise DebuggerError('Failed to run monitor cmd "%s"!' % cmd)
-        return resp
+        return resp,target_output
 
     def wait_target_state(self, state, tmo=None):
         """

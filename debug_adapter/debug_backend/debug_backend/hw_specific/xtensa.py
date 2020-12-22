@@ -7,6 +7,7 @@ class OocdXtensa(Oocd):
     """
         Class to communicate to OpenOCD supporting Xtensa-specific features
     """
+    chip_name = 'xtensa'
 
     def __init__(self, oocd_exec=None, oocd_scripts=None, oocd_cfg_files=[], oocd_cfg_cmds=[],
                  oocd_debug=2, oocd_args=[], host='localhost', log_level=None, log_stream_handler=None, log_file_handler=None):
@@ -62,6 +63,7 @@ class GdbXtensa(Gdb):
     """
         Class to communicate to GDB supporting Xtensa-specific features
     """
+    chip_name = 'xtensa'
 
     def __init__(self, gdb_path='gdb', remote_target=None, extended_remote_mode=False, gdb_log_file=None,
                  log_level=None, log_stream_handler=None, log_file_handler=None):
