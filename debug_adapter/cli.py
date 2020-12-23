@@ -30,24 +30,25 @@ from .debug_adapter import A2VSC_STARTED_STRING, DebugAdapter
 from .internal_classes import DaDevModes, DaOpenOcdModes, DaArgs
 
 h = {
-    "--app_flash_off": 'Program start address offset (ESP32_APP_FLASH_OFF)',
+    "--app_flash_off": 'Program start address offset (ESP32_APP_FLASH_OFF). The value can be in decimal, binary, octal \
+        or hexadecimal formats',
     "--board-type": 'Type of the board to run tests on (you could use OOCD_TEST_BOARD envvar by default)',
     "--debug": 'Debug level (0-4), 5 - for a full OOCD log',
     "--developer-mode": 'Modes for development purposes',
     "--device-name": 'The name of used hardware to debug (currently Esp32 or Esp32_S2). It defines '
-                     '--toolchain-prefix',
+    '--toolchain-prefix',
     "--port": "Listen on given port for VS Code connections",
     "--log-file": 'Path to log file.',
     "--log-mult-files": 'Log to separated files',
     "--toolchain-prefix": '(If not set, controlled by --device-name!) Toolchain prefix. If set, rewrites the value '
-                          'specified by --device-name.',
+    'specified by --device-name.',
     "--elfpath": 'A path to elf files for debugging. You can use several elf files e.g. `-e file1.elf -e '
-                 'file2.elf`',
+    'file2.elf`',
     "--core-file": 'Use a file as a core dump to examine.',
     "--oocd": 'Path to OpenOCD binary file, (used OPENOCD_BIN envvar or (if not set) '
-              '\'openocd\' by default)',
+    '\'openocd\' by default)',
     "--oocd-args": "(If not set, drives by --device-name!) Specifies custom OpenOCD args. If set, rewrites the"
-                   " value specified by --device-name.",
+    " value specified by --device-name.",
     "--oocd-mode": 'Cooperation with OpenOCD',
     "--oocd-ip": "Ip for remote OpenOCD connection",
     "--postmortem": "Run the adapter without target in \'read-only\' mode",
@@ -56,20 +57,43 @@ h = {
 }
 
 
+class IntegerWithPrefix(click.ParamType):
+    """
+    Custom Cick type accepting numbers in different basis
+    """
+    name = 'integer_with_prefix'
+
+    def convert(self, value, param, ctx):
+        try:
+            if isinstance(value, int):
+                return value
+            if isinstance(value, str) and value[0] == '0' and value[1].isnumeric():  # convert 0123 as 8-based 123
+                return int(value, 8)
+            return int(value, 0)
+        except ValueError:
+            self.fail('%s is not a valid integer' % value, param, ctx)
+
+
+INT_PREF = IntegerWithPrefix()
+
+
 # TODO Toolchain from "idf.xtensaEsp32Path" settings.json
 # TODO xtensaEsp32Path -> xtensaEspToolchainPath, espToolchainPath
 @click.command()
 # Basic parameters:
-@click.option("--app_flash_off", "-a", help=h["--app_flash_off"], type=Union[int], default=0x10000, show_default=True)
+@click.option("--app_flash_off", "-a", help=h["--app_flash_off"], type=INT_PREF, default=0x10000, show_default=True)
 @click.option('--board-type', '-b', help=h['--board-type'], type=Union[str])
-@click.option('--debug', '-d', help=h['--debug'], type=Union[int], default=2, show_default=True)
+@click.option('--debug', '-d', help=h['--debug'], type=INT_PREF, default=2, show_default=True)
 @click.option('--device-name', '-dn', help=h['--device-name'], type=Union[str], default=None, show_default=True)
-@click.option('--port', '-p', help=h['--port'], default=43474, show_default=True, type=Union[int])
+@click.option('--port', '-p', help=h['--port'], default=43474, show_default=True, type=INT_PREF)
 #
 # Specific modes:
 @click.option('--postmortem', '-pm', help=h['--postmortem'], is_flag=True)
-@click.option('--developer-mode', help=h['--developer-mode'], type=click.Choice(DaDevModes.get_modes()),
-              default=DaDevModes.NONE, show_default=True)
+@click.option('--developer-mode',
+              help=h['--developer-mode'],
+              type=click.Choice(DaDevModes.get_modes()),
+              default=DaDevModes.NONE,
+              show_default=True)
 # logging parameters:
 @click.option('--log-file', '-l', help=h['--log-file'], type=Union[str])
 @click.option('--log-mult-files', '-lm', help=h['--log-mult-files'], default=None, is_flag=True)
@@ -88,8 +112,12 @@ h = {
 # OpenOCD parameters:
 @click.option('--oocd', '-o', help=h['--oocd'], default=os.environ.get("OPENOCD_BIN", "openocd"), show_default=True)
 @click.option('--oocd-args', '-oa', help=h['--oocd-args'], default=None, show_default=True)
-@click.option('--oocd-mode', '-om', help=h['--oocd-mode'], type=click.Choice(DaOpenOcdModes.get_modes()),
-              default=DaOpenOcdModes.CONNECT, show_default=True)
+@click.option('--oocd-mode',
+              '-om',
+              help=h['--oocd-mode'],
+              type=click.Choice(DaOpenOcdModes.get_modes()),
+              default=DaOpenOcdModes.CONNECT,
+              show_default=True)
 @click.option('--oocd-ip', '-ip', help=h['--oocd-ip'], default='localhost', show_default=True, type=Union[str])
 @click.option('--oocd-scripts', '-s', help=h['--oocd-scripts'], default=None, show_default=True)
 #
