@@ -1,4 +1,5 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
+# Additions Copyright (c) 2020, Espressif Systems (Shanghai) Co. Ltd.
 # Licensed under the MIT License. See LICENSE in the project root
 # for license information.
 
@@ -14,6 +15,7 @@ import time
 from debugpy.common import log, messaging
 from tests.patterns import some
 from tests.timeline import Timeline, Mark, Event, Request, Response
+from tests.pytest_fixtures import daemon
 
 
 class MessageFactory(object):

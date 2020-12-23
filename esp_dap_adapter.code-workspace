@@ -1,0 +1,100 @@
+{
+	"folders": [
+		{
+			"path": "debug_adapter"
+		}
+	],
+	"settings": {
+		"python.testing.pytestEnabled": true,
+		"python.testing.unittestEnabled": false,
+		"python.testing.nosetestsEnabled": false,
+		"python.analysis.extraPaths": [
+			"tests/debugpy_tests",
+			"tests/debugpy",
+			"tests/debugpy/_vendored",
+			"tests/debugpy/_vendored/pydevd",
+			"tests"
+		],
+		"python.testing.pytestArgs": [
+			"${workspaceFolder}/tests/",
+			// "-s" // uncomment to full output
+		],
+	},
+	"extensions": {
+		"recommendations": [
+			"ms-python.python",
+			"ms-python.vscode-pylance",
+		]
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "Python Style Check",
+				"type": "shell",
+				"command": "python3 -m flake8 --config=${workspaceFolder}/.flake8 --tee"
+			},
+			{
+				"label": "Build test targets",
+				"type": "shell",
+				"command": "python3 ${workspaceFolder}/tests/target/build_all.py"
+			}
+		]
+	},
+	"launch": {
+		"configurations": [
+			{
+				"name": "Python: Current File",
+				"type": "python",
+				"request": "launch",
+				"program": "${file}",
+				"console": "integratedTerminal",
+				"env": {
+					"PYTHONPATH": "${workspaceFolder}"
+				},
+				"cwd": "${workspaceFolder}"
+			},
+			{
+				"name": "Debug Adapter with coredump",
+				"type": "python",
+				"request": "launch",
+				"program": "${workspaceFolder}/debug_adapter_main.py",
+				"args": [
+					"-e",
+					"${workspaceFolder}/tests/target/blink.elf",
+					"-c",
+					"${workspaceFolder}/tests/target/coredump.elf",
+					"-l",
+					"debug.log",
+					"-ln",
+					"-d",
+					"4",
+					"-dn",
+					"esp32"
+				],
+				"console": "integratedTerminal",
+				"env": {
+					"PYTHONPATH": "${workspaceFolder}"
+				}
+			},
+			{
+				"name": "Debug Adapter with host application",
+				"type": "python",
+				"request": "launch",
+				"program": "${workspaceFolder}/debug_adapter_main.py",
+				"args": [
+					"-l", "debug.log",
+					"-ln",
+					"-d", "4",
+					"-om", "without_oocd",
+					"-e", "${workspaceFolder}/tests/target/x86/test_app.exe"
+				],
+				"console": "integratedTerminal",
+				"env": {
+					"PYTHONPATH" : "${workspaceFolder}"
+				}
+			},
+		],
+		"compounds": []
+	}
+}

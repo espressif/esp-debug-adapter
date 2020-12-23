@@ -8,7 +8,6 @@
 # SPDX-License-Identifier: EPL-2.0
 
 import json
-import sys
 from queue import Queue
 from . import schema, base_schema, log
 from .tools import get_good_path, Measurement
@@ -249,8 +248,15 @@ class CommandProcessor(object):
         event = schema.StoppedEvent(body)
         self.write_message(event)
 
-    def generate_OutputEvent(self, output, category=None, group=None, variablesReference=None, source=None, line=None,
-                             column=None, data=None):
+    def generate_OutputEvent(self,
+                             output,
+                             category=None,
+                             group=None,
+                             variablesReference=None,
+                             source=None,
+                             line=None,
+                             column=None,
+                             data=None):
         """
         Parameters
         ----------
@@ -288,10 +294,16 @@ class CommandProcessor(object):
             categories the data is shown in JSON format.
 
         """
-        body = schema.OutputEventBody(output=output, category=category, variablesReference=variablesReference,
-                                      source=source, line=line, column=column, data=data)
-        event = schema.OutputEvent(body)
-        self.write_message(event)
+        if not self.args.log_no_debug_console:
+            body = schema.OutputEventBody(output=output,
+                                          category=category,
+                                          variablesReference=variablesReference,
+                                          source=source,
+                                          line=line,
+                                          column=column,
+                                          data=data)
+            event = schema.OutputEvent(body)
+            self.write_message(event)
 
     def generate_ContinuedEvent(self, thread_id, all_threads_continued=None):
         """
@@ -392,12 +404,13 @@ class CommandProcessor(object):
                 name = frame.get('addr')
             else:
                 name = frame.get('func')
-            sf = schema.StackFrame(id=self.da.frame_id_generate(thread_id, frame['level']),
-                                   name=name,
-                                   line=line,
-                                   column=0,
-                                   source=src,
-                                   )
+            sf = schema.StackFrame(
+                id=self.da.frame_id_generate(thread_id, frame['level']),
+                name=name,
+                line=line,
+                column=0,
+                source=src,
+            )
             stack_frames_list.append(sf.to_dict())  # to_dict because of a json encoding error
         kwargs = {
             'body': schema.StackTraceResponseBody(stackFrames=stack_frames_list, totalFrames=len(stack_frames_list))
@@ -416,10 +429,9 @@ class CommandProcessor(object):
         scopes_for_body = []  # type: list[schema.Scope]
         scopes = self.da.get_scopes()
         for scope in scopes:
-            scope_dap_obj = schema.Scope(
-                name=scope['name'],
-                variablesReference=len(scope['vals_list']),
-                expensive=False)
+            scope_dap_obj = schema.Scope(name=scope['name'],
+                                         variablesReference=len(scope['vals_list']),
+                                         expensive=False)
             scopes_for_body.append(scope_dap_obj.to_dict())
         # building a response:
         kwargs = {'body': schema.ScopesResponseBody(scopes=scopes_for_body)}
@@ -451,8 +463,9 @@ class CommandProcessor(object):
             name = request.arguments.name
             value = request.arguments.value
             self.da.set_variable(name, value)
-            response = base_schema.build_response(request, kwargs={
-                'body': {'value': value}})  # type: schema.SetVariableResponse
+            response = base_schema.build_response(request, kwargs={'body': {
+                'value': value
+            }})  # type: schema.SetVariableResponse
             self.write_message(response)
 
     def on_evaluate_request(self, request):
@@ -478,17 +491,22 @@ class CommandProcessor(object):
 
             self.da._gdb.stream_handler_set('console', get_output)
             self.da.gdb_execute(expression[6:])
-            evaluate_response = base_schema.build_response(request, kwargs={
-                'body': {'result': cmd_output.replace("\\n", "\n"), 'variablesReference': 0}})
+            evaluate_response = base_schema.build_response(
+                request, kwargs={'body': {
+                    'result': cmd_output.replace("\\n", "\n"),
+                    'variablesReference': 0
+                }})
 
         # if the expression did't start with  `-exec` do the evaluate command
         else:
             result = self.da.evaluate(expression)  # no symbol and other errors processing
-            evaluate_response = base_schema.build_response(request, kwargs={
-                'body': {'result': str(result), 'variablesReference': 0}})
+            evaluate_response = base_schema.build_response(
+                request, kwargs={'body': {
+                    'result': str(result),
+                    'variablesReference': 0
+                }})
         self.write_message(evaluate_response)
-        self.generate_OutputEvent(output="WARNING! This feature can't update UI after execution.",
-                                  category="console")
+        self.generate_OutputEvent(output="WARNING! This feature can't update UI after execution.", category="console")
 
     def on_setExpression_request(self, request):
         """
@@ -547,8 +565,8 @@ class CommandProcessor(object):
         self.generate_OutputEvent("Debug Adapter stopped\n")
         self.da.adapter_stop()
         self.write_message(disconnect_response)
-        if not restart:
-            sys.exit()
+        if restart:
+            self.da.adapter_restart()
 
     def on_pause_request(self, request):
         """
@@ -565,9 +583,7 @@ class CommandProcessor(object):
             thread_id = request.arguments.threadId
             self.da.pause()
             self.write_message(response)
-            self.generate_StoppedEvent(reason='pause',
-                                       thread_id=int(thread_id),
-                                       all_threads_stopped=True)
+            self.generate_StoppedEvent(reason='pause', thread_id=int(thread_id), all_threads_stopped=True)
 
     def generate_BreakpointEvent(self, reason, bp):
         """
@@ -583,16 +599,17 @@ class CommandProcessor(object):
         self.write_message(event)
 
     def on_setBreakpoints_request(self, request):
-        def try_set_once(source_path, line, condition):
-            try:
-                return self.da.break_add("%s:%s" % (source_path, line), condition=condition)
-            except Exception as e:
-                raise e
         """
         Parameters
         ----------
         request: schems.SetBreakpointsRequest
         """
+        def try_set_once(source_path, line, condition):
+            try:
+                return self.da.break_add("%s:%s" % (source_path, line), condition=condition)
+            except Exception as e:
+                raise e
+
         if self.da.args.postmortem:
             kwargs = {'body': schema.SetBreakpointsResponseBody([])}
             response = base_schema.build_response(request, kwargs)
@@ -661,9 +678,7 @@ class CommandProcessor(object):
             response.success = result
             self.write_message(response)
             if result:
-                self.generate_StoppedEvent(reason='step',
-                                           thread_id=thread_id,
-                                           all_threads_stopped=True)
+                self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
             m.stop_n_check(0.5, "The step operation took too long")
 
     def on_stepIn_request(self, request):
@@ -684,9 +699,7 @@ class CommandProcessor(object):
             response.success = result
             self.write_message(response)
             if result:
-                self.generate_StoppedEvent(reason='step',
-                                           thread_id=thread_id,
-                                           all_threads_stopped=True)
+                self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
 
     def on_stepOut_request(self, request):
         """
@@ -706,9 +719,7 @@ class CommandProcessor(object):
             response.success = result
             self.write_message(response)
             if result:
-                self.generate_StoppedEvent(reason='step',
-                                           thread_id=thread_id,
-                                           all_threads_stopped=True)
+                self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
 
     def write_message(self, protocol_message):
         """

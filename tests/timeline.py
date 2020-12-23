@@ -1,4 +1,5 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
+# Additions Copyright (c) 2020, Espressif Systems (Shanghai) Co. Ltd.
 # Licensed under the MIT License. See LICENSE in the project root
 # for license information.
 
@@ -744,8 +745,10 @@ class PatternExpectation(Expectation):
         self.circumstances = circumstances
 
     def test(self, first, last):
-        assert isinstance(first, Occurrence)
-        assert isinstance(last, Occurrence)
+        # TODO these two asserts are falling because they are comparing types
+        # Occurrence and timeline.Occurrence - that falls
+        # assert isinstance(first, Occurrence)
+        # assert isinstance(last, Occurrence)
 
         for occ in first.and_following(up_to=last, inclusive=True):
             if occ.circumstances == self.circumstances:

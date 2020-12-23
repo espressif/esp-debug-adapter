@@ -40,6 +40,7 @@ h = {
     "--port": "Listen on given port for VS Code connections",
     "--log-file": 'Path to log file.',
     "--log-mult-files": 'Log to separated files',
+    "--log-no-debug-console": 'Turn off output to the debug console of the IDE',
     "--toolchain-prefix": '(If not set, controlled by --device-name!) Toolchain prefix. If set, rewrites the value '
     'specified by --device-name.',
     "--elfpath": 'A path to elf files for debugging. You can use several elf files e.g. `-e file1.elf -e '
@@ -98,6 +99,7 @@ INT_PREF = IntegerWithPrefix()
 # logging parameters:
 @click.option('--log-file', '-l', help=h['--log-file'], type=Union[str])
 @click.option('--log-mult-files', '-lm', help=h['--log-mult-files'], default=None, is_flag=True)
+@click.option('--log-no-debug-console', '-ln', help=h['--log-no-debug-console'], default=None, is_flag=True)
 #
 # GDB parameters:
 @click.option('--toolchain-prefix',

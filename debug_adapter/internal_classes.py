@@ -23,7 +23,6 @@
 # SPDX-License-Identifier: MIT
 
 from enum import IntEnum
-from . import debug_backend as dbg
 
 # `typing` is used for provide Python2-compatible typing hint for IDEs like PyCharm.
 # Some  other tools like flake8, language server of VSCode - Pylance  do not sopport it
@@ -64,22 +63,23 @@ class DaDevModes(Modes):
 
 
 class DaRunState(IntEnum):
-    STOPPED = -1
+    STOPPED = -2
+    STOP_PREPARATION = -1
     UNKNOWN = 0
-    CONNECTED = 1
-    RUNNING = 2
-    INITIALIZED = 3
-    CONFIGURED = 4
-    READY = 5
+    RUNNING = 1
+    READY_TO_CONNECT = 2
+    CONNECTED = 3
+    INITIALIZED = 4
+    CONFIGURED = 5
+    READY = 6
 
 
 class DaStates(object):
-    run_state = DaRunState.STOPPED  # type: DaRunState
+    general_state = DaRunState.STOPPED  # type: DaRunState
     ready = False  # TODO: replace to a lock
     no_debug = False  # argument of a launch request
     gdb_started = False
     ocd_started = False
-    wait_target_state = dbg.TARGET_STATE_UNKNOWN
     threads_updated = False  # True if something called a get_threads() method
     threads_are_stopped = None  # type: Union[bool, None]
     # sets to False after the update processed (for example, stopEvent generated)
@@ -91,11 +91,27 @@ class DaArgs(object):
     """
     Contains mandatory set of Da arguments. Can be extended with **kwargs
     """
-
-    def __init__(self, app_flash_off=None, board_type="", debug=2, device_name="",
-                 developer_mode=None, postmortem=False, elfpath=(), log_file=None, log_mult_files=False, oocd="",
-                 oocd_args=None, oocd_mode="", oocd_ip="", port=43474, oocd_scripts="", toolchain_prefix="",
-                 cmdfile="", core_file=(), **kwargs):
+    def __init__(self,
+                 app_flash_off=None,
+                 board_type="",
+                 cmdfile="",
+                 core_file=(),
+                 debug=2,
+                 developer_mode=None,
+                 device_name="",
+                 elfpath=(),
+                 log_file=None,
+                 log_mult_files=False,
+                 log_no_debug_console=False,
+                 oocd_args=None,
+                 oocd_ip="",
+                 oocd_mode="",
+                 oocd_scripts="",
+                 oocd="",
+                 port=43474,
+                 postmortem=False,
+                 toolchain_prefix="",
+                 **kwargs):
         """
 
         Parameters
@@ -108,6 +124,7 @@ class DaArgs(object):
         elfpath: Tuple[str]
         log_file: str
         log_mult_files: bool
+        log_no_debug_console:bool
         oocd: str
         oocd_args: str
         oocd_ip: str
@@ -128,6 +145,7 @@ class DaArgs(object):
         self.cmdfile = cmdfile
         self.log_file = log_file
         self.log_mult_files = log_mult_files
+        self.log_no_debug_console = log_no_debug_console
         self.oocd = oocd
         self.oocd_args = oocd_args
         self.oocd_ip = oocd_ip

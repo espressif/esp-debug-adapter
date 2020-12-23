@@ -1,0 +1,10 @@
+## Used to run the tests:
+debugpy
+pydevd
+pytest
+pytest-xdist
+pytest-cov
+pytest-timeout
+
+## Used by CI tasks:
+flake8

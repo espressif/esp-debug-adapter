@@ -22,36 +22,17 @@
 #
 # SPDX-License-Identifier: MIT
 
-from tests.conftest import setup_teardown  # noqa: F401
-import debug_adapter
-import pytest
+import pathlib
+from debug_adapter import schema
 
 
-@pytest.mark.timeout(30)
-def test_daargs_class(setup_teardown):  # noqa: F811
-    da_args = debug_adapter.DaArgs()
-    assert isinstance(da_args, debug_adapter.DaArgs)
-
-    val = "test_args.log"
-    da_args.port = val
-    assert da_args.port == val
-
-    val = "test_args.log"
-    da_args = debug_adapter.DaArgs(log_file=val)
-    assert da_args.log_file == val
-
-    da_args_new_int = debug_adapter.DaArgs(new_arg_int=123)
-    assert da_args_new_int.new_arg_int == 123
-
-    val = 123
-    da_args = debug_adapter.DaArgs(new_arg_int=val)
-    assert da_args.new_arg_int == val
-
-    val = "123"
-    da_args = debug_adapter.DaArgs(new_arg2_str=val)
-    assert da_args.new_arg2_str == val
-
-
-if __name__ == "__main__":
-    # run tests from this file; print all output
-    pytest.main([__file__, "-s"])
+def build_setbp_request(path, line):
+    if isinstance(path, pathlib.Path):
+        path = str(path)
+    rq = schema.SetBreakpointsRequest(arguments={
+        "source": schema.Source(path=path),
+        "breakpoints": [{
+            "line": line
+        }],
+    })
+    return rq
