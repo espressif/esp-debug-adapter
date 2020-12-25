@@ -700,9 +700,9 @@ class DebugAdapter:
             self.pause()
         if not self.args.postmortem:
             if self.args.cmdfile:  # if a custom startup file specified, execute only it
-                self._gdb.exec_run(only_startup=True, startup_tmo=0)
+                self._gdb.exec_run(off=self.args.app_flash_off, only_startup=True, startup_tmo=0)
             else:
-                self._gdb.exec_run(start_func="app_main")
+                self._gdb.exec_run(off=self.args.app_flash_off, start_func="app_main")
             if start:
                 self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 10)
 

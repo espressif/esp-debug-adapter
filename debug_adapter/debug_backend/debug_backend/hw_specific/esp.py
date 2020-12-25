@@ -111,7 +111,7 @@ class GdbEspXtensa(GdbXtensa):
                                            extended_remote_mode=extended_remote_mode, gdb_log_file=gdb_log_file,
                                            log_level=log_level, log_stream_handler=log_stream_handler,
                                            log_file_handler=log_file_handler)
-        self.app_flash_offset = 0x10000  # default for for ESP xtensa chips
+        # self.app_flash_offset = 0x10000  # default for for ESP xtensa chips
         self.prog_startup_cmdfile = os.path.join(DEFAULT_GDB_INIT_SCRIPT_DIR, "esp_init.gdb")
 
     def target_program(self, file_name, off, actions='verify', tmo=30):
@@ -129,12 +129,12 @@ class GdbEspXtensa(GdbXtensa):
         """
         self.monitor_run('program_esp %s %s 0x%x' % (fixup_path(file_name), actions, int(off)), tmo)
 
-    def _update_memory_map(self):
-        self.monitor_run('esp appimage_offset 0x%x' % self.app_flash_offset, 5)
+    def _update_memory_map(self, off):
+        self.monitor_run('esp appimage_offset 0x%x' % off, 5)
         self.disconnect()
         self.connect()
 
-    def exec_run(self, start_func='app_main', startup_tmo=5, only_startup=False):
+    def exec_run(self, off, start_func='app_main', startup_tmo=5, only_startup=False):
         """
         Implements logic of `run` and `start` commands. Executes a startup command file in the beginning if it specified
 
@@ -154,7 +154,7 @@ class GdbEspXtensa(GdbXtensa):
         else:
             self.target_reset()
         self.wait_target_state(TARGET_STATE_STOPPED, 10)
-        self._update_memory_map()
+        self._update_memory_map(off)
         if start_func:
             self.add_bp(start_func, tmp=True)
         self.resume()
