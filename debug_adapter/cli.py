@@ -67,7 +67,8 @@ class IntegerWithPrefix(click.ParamType):
         try:
             if isinstance(value, int):
                 return value
-            if isinstance(value, str) and value[0] == '0' and value[1].isnumeric():  # convert 0123 as 8-based 123
+            if (isinstance(value, str) and len(value) > 1 and value[0] == '0' and value[1].isnumeric()):
+                # convert 0123 as 8-based 123
                 return int(value, 8)
             return int(value, 0)
         except ValueError:
