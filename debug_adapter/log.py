@@ -23,6 +23,7 @@
 # SPDX-License-Identifier: MIT
 
 from logging import CRITICAL, ERROR, WARNING, INFO, DEBUG, Formatter, FileHandler, Logger, StreamHandler, NOTSET
+from .internal_classes import DaArgs
 import os
 import sys
 import threading
@@ -40,7 +41,7 @@ formatter = None
 stream_handler = None
 file_handler = None
 level = DEBUG
-args = None
+args = None  # type: DaArgs
 __da = None  # placeholder for debug adapter instance. Need for avoiding circular imports
 start_time = None  # type: Any[str, None]
 _top_logger = None  # type: Any[Logger, None]
@@ -120,7 +121,12 @@ def getLogger(name=None, with_console_output=True):
     return DebugAdapterLogger(name, with_console_output=with_console_output)
 
 
-def init(in_args, start_time_str='', add_to_file_name='', da_inst=None, backup_old_log=CFG_BACKUP_OLD_LOG):
+def init(in_args,
+         start_time_str='',
+         add_to_file_name='',
+         da_inst=None,
+         backup_old_log=CFG_BACKUP_OLD_LOG,
+         no_debug_console=False):
     err_msg = None
     global CGF_LOG_TO_MULT_FILES
     global formatter
@@ -165,12 +171,16 @@ def init(in_args, start_time_str='', add_to_file_name='', da_inst=None, backup_o
         file_handler = None
     _top_logger = new_logger(log_name='Debug Adapter (main)',
                              stream_handler_=stream_handler,
-                             file_handler_=file_handler)
+                             file_handler_=file_handler,
+                             with_console_output=(not args.log_no_debug_console))
     debug_no_con("START_TIME_" + start_time)
     debug_no_con("Init errors:" + str(err_msg))
 
 
-def new_logger(log_name='Logger', logging_level_=None, stream_handler_=None, file_handler_=None,
+def new_logger(log_name='Logger',
+               logging_level_=None,
+               stream_handler_=None,
+               file_handler_=None,
                with_console_output=True):
     """
 

@@ -3,6 +3,7 @@ import subprocess
 import telnetlib
 import threading
 import time
+import re
 from .defs import *
 from . import log
 
@@ -148,3 +149,17 @@ class Oocd(threading.Thread):
             resp = resp[:index_end]
         self._logger.debug('TELNET <-: %s' % resp)
         return resp.decode('utf-8')
+
+    # this function is used by 'get_reg' and
+    # also can be used to parse output of the 'reg' command executed via GDB's 'monitor'
+    def parse_reg_val(self, nm, res_str):
+        # format: pc (/32): 0x400E4E72
+        tokens = re.match('%s[ \t]+\(/\d+\):[ \t]+(?P<val>0x[0-9a-fA-F]+)' % nm, res_str)
+        return int(tokens.group('val'), 0)
+
+    def get_reg(self, nm):
+        res_str = self.cmd_exec('reg %s' % nm)
+        return self.parse_reg_val(nm, res_str)
+
+    def set_reg(self, nm, val):
+        self.cmd_exec('reg %s %s' % (nm, val))

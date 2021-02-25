@@ -22,36 +22,40 @@
 #
 # SPDX-License-Identifier: MIT
 
-from tests.conftest import setup_teardown  # noqa: F401
-import debug_adapter
+from tests.conftest import setup_teardown, coredump_args, hostapp_args  # noqa: F401
+from t_session import TSession
+from tests import timeline
 import pytest
+# from tests.patterns import some
+from tests.standard_requests import REQUEST_INIT, REQUEST_LAUNCH
 
 
 @pytest.mark.timeout(30)
-def test_daargs_class(setup_teardown):  # noqa: F811
-    da_args = debug_adapter.DaArgs()
-    assert isinstance(da_args, debug_adapter.DaArgs)
+def test_init_launch_coredump(setup_teardown, coredump_args):  # noqa: F811
+    with TSession(coredump_args) as ts:
+        print("Session is run")
+        ts.send_request(REQUEST_INIT)
+        ts.send_request(REQUEST_LAUNCH)
+        # if we have this event, GDB successfully loaded and started the application:
+        expectation = timeline.Event("initialized")
+        result = ts.wait_for(expectation, timeout_s=5)
+        assert result
+    print("Session is stopped")
 
-    val = "test_args.log"
-    da_args.port = val
-    assert da_args.port == val
 
-    val = "test_args.log"
-    da_args = debug_adapter.DaArgs(log_file=val)
-    assert da_args.log_file == val
-
-    da_args_new_int = debug_adapter.DaArgs(new_arg_int=123)
-    assert da_args_new_int.new_arg_int == 123
-
-    val = 123
-    da_args = debug_adapter.DaArgs(new_arg_int=val)
-    assert da_args.new_arg_int == val
-
-    val = "123"
-    da_args = debug_adapter.DaArgs(new_arg2_str=val)
-    assert da_args.new_arg2_str == val
+@pytest.mark.timeout(30)
+def test_init_launch_hostapp(setup_teardown, hostapp_args):  # noqa: F811
+    with TSession(hostapp_args) as ts:
+        print("Session is run")
+        ts.send_request(REQUEST_INIT)
+        ts.send_request(REQUEST_LAUNCH)
+        # if we have this event, GDB successfully loaded and started the application:
+        expectation = timeline.Event("initialized")
+        result = ts.wait_for(expectation, timeout_s=5)
+        assert result
+    print("Session is stopped")
 
 
 if __name__ == "__main__":
-    # run tests from this file; print all output
+    # run tests from this file; print all output;
     pytest.main([__file__, "-s"])

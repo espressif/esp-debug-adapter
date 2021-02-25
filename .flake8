@@ -7,6 +7,10 @@ exclude =   .venv
             scripts
             debug_adapter/schema.py
             debug_adapter/base_schema.py
+            tests/debugpy
+            tests/patterns
+            tests/test_timeline.py
+            tests/timeline.py
 max-complexity = 10
 ignore = F405
 per-file-ignores =

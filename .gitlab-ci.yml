@@ -35,7 +35,8 @@ tests_unit:
     - gdb_amd64_test
   artifacts:
     paths:
-    - /tests/*.log
+    - "*.log"
+    - tests/*.log
     - tests/results/*
     reports:
       junit:
@@ -43,6 +44,10 @@ tests_unit:
     when: always
     expire_in: 1 week
   script:
-    - python3 -m pip install -r requirements.txt
+    - apt-get update && apt-get install -y build-essential gdb gcc
+    - python3 -m pip install -r ./requirements.txt
+    - python3 -m pip install -r ./tests/requirements.txt
+    - python3 ./tests/target/build_all.py
     - cd $CI_PROJECT_DIR/tests
-    - python3 ./run_tests.py
+    - python3 -m pytest
+    # - python3 ./run_tests.py
