@@ -30,7 +30,7 @@ from tests.helpers import build_setbp_request, continue_till_stopped, get_top_fr
 import timeline
 from tests.standard_requests import REQUEST_INIT, REQUEST_LAUNCH
 from tests.patterns import some
-
+import time
 
 @pytest.mark.timeout(30)
 def test_threads(setup_teardown, coredump_args):  # noqa: F811
@@ -103,11 +103,23 @@ def test_continue(setup_teardown, hostapp_args):  # noqa: F811
         assert name == "main"
         assert line == 7
 
+
+@pytest.mark.timeout(30)
+def test_pause(setup_teardown, hostapp_args):  # noqa: F811
+    with TSession(hostapp_args) as ts:
+        ts.send_request(REQUEST_INIT)
+        ts.send_request(REQUEST_LAUNCH)
+
         rq = schema.ContinueRequest(arguments=schema.ContinueArguments(0))
         resp = ts.send_request(rq)
         assert resp.success
 
-        expectation = timeline.Event(event="stopped", body=some.dict.containing({"reason": "breakpoint"}))
+        time.sleep(3.0)
+        rq = schema.PauseRequest(arguments=schema.PauseArguments(threadId=0))
+        resp = ts.send_request(rq)
+        assert resp.success
+
+        expectation = timeline.Event(event="stopped", body=some.dict.containing({"reason": "pause"}))
         result = ts.wait_for(expectation, timeout_s=5)
         assert result
 
