@@ -84,10 +84,15 @@ class CommandProcessor(object):
 
         """
         m = Measurement()
-        self.da.adapter_init()
-        self.generate_OutputEvent("Debug Adapter initialized\n")
-        # response
         response = base_schema.build_response(request)  # type: schema.InitializeResponse
+        try:
+            self.da.adapter_init()
+        except Exception:
+            response.success = False
+            response.message = "Failed to init Debug Adapter!"
+            self.write_message(response)
+            return
+        # response
         if self.da.args.postmortem:
             response.body.supportsConfigurationDoneRequest = True
             response.body.supportsRestartRequest = True
@@ -133,6 +138,7 @@ class CommandProcessor(object):
         self.write_message(response)
         # done event
         self.write_message(schema.InitializedEvent())
+        self.generate_OutputEvent("Debug Adapter initialized\n")
         if self.da.args.postmortem:
             self.da._gdb._target_state = 1
             self.generate_StoppedEvent(reason="exception",
