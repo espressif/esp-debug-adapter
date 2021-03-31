@@ -26,7 +26,7 @@ from tests.conftest import setup_teardown, coredump_args, hostapp_args  # noqa: 
 from debug_adapter import schema
 from t_session import TSession
 import pytest
-from tests.helpers import build_setbp_request
+from tests.helpers import build_setbp_request, continue_till_stopped, get_top_frame_info, get_stack_trace
 import timeline
 from tests.standard_requests import REQUEST_INIT, REQUEST_LAUNCH
 from tests.patterns import some
@@ -61,13 +61,31 @@ def test_stack(setup_teardown, coredump_args):  # noqa: F811
 
 
 @pytest.mark.timeout(30)
-def test_breakpoints(setup_teardown, hostapp_args):  # noqa: F811
+def test_source_breakpoints(setup_teardown, hostapp_args):  # noqa: F811
     with TSession(hostapp_args) as ts:
         ts.send_request(REQUEST_INIT)
         ts.send_request(REQUEST_LAUNCH)
-        rq = build_setbp_request("test_app.c", 3)
+        rq = build_setbp_request("test_app.c", [{"line": 7}])
         resp = ts.send_request(rq)
         assert resp.success
+        rq = build_setbp_request("test_app_src2.c", [{"line": 3}, {"line": 17}])
+        resp = ts.send_request(rq)
+        assert resp.success
+        # run to the first breakpoint
+        continue_till_stopped(ts, stop_reason="breakpoint", timeout=5)
+        line, name = get_top_frame_info(ts, thread_id=1)
+        assert name == "main"
+        assert line == 7
+        # run to  the next breakpoint
+        continue_till_stopped(ts, stop_reason="breakpoint", timeout=5)
+        line, name = get_top_frame_info(ts, thread_id=1)
+        assert name == "print_hamlet"
+        assert line == 3
+        # run to  the next breakpoint
+        continue_till_stopped(ts, stop_reason="breakpoint", timeout=5)
+        line, name = get_top_frame_info(ts, thread_id=1)
+        assert name == "print_hamlet"
+        assert line == 17
 
 
 @pytest.mark.timeout(30)
@@ -76,9 +94,14 @@ def test_continue(setup_teardown, hostapp_args):  # noqa: F811
         ts.send_request(REQUEST_INIT)
         ts.send_request(REQUEST_LAUNCH)
 
-        rq = build_setbp_request("test_app.c", 3)
+        rq = build_setbp_request("test_app.c", [{"line": 7}])
         resp = ts.send_request(rq)
         assert resp.success
+        # run to the first breakpoint
+        continue_till_stopped(ts, stop_reason="breakpoint", timeout=5)
+        line, name = get_top_frame_info(ts, thread_id=1)
+        assert name == "main"
+        assert line == 7
 
         rq = schema.ContinueRequest(arguments=schema.ContinueArguments(0))
         resp = ts.send_request(rq)
@@ -91,35 +114,18 @@ def test_continue(setup_teardown, hostapp_args):  # noqa: F811
 
 @pytest.mark.timeout(30)
 def test_step(setup_teardown, hostapp_args):  # noqa: F811
-    def get_top_frame_info():
-        rq = schema.StackTraceRequest(arguments=schema.StackTraceArguments(threadId=1, startFrame=0, levels=20))
-        resp = ts.send_request(rq)
-        stack = resp.body.get("stackFrames")
-        line = stack[0].get("line")
-        name = stack[0].get("name")
-        return line, name
-
     with TSession(hostapp_args) as ts:
         ts.send_request(REQUEST_INIT)
         ts.send_request(REQUEST_LAUNCH)
 
         # Set BP on `int lines = 0;` of `test_app.c`
         bpline = 4
-        rq = build_setbp_request("test_app.c", bpline)
+        rq = build_setbp_request("test_app_src2.c", [{"line": bpline}])
         resp = ts.send_request(rq)
         assert resp.success
-
         # Continue to the BP
-        rq = schema.ContinueRequest(arguments=schema.ContinueArguments(threadId=1))
-        resp = ts.send_request(rq)
-        assert resp.success
-
-        # Wait for stop on the BP
-        expectation = timeline.Event(event="stopped", body=some.dict.containing({"reason": "breakpoint"}))
-        result = ts.wait_for(expectation, timeout_s=5)
-        assert result
-        # Check the state
-        line, name = get_top_frame_info()
+        continue_till_stopped(ts, stop_reason="breakpoint", timeout=5)
+        line, name = get_top_frame_info(ts, thread_id=1)
         assert line == bpline
         assert name == "print_hamlet"
 
@@ -128,7 +134,7 @@ def test_step(setup_teardown, hostapp_args):  # noqa: F811
         resp = ts.send_request(rq)
         assert resp.success
         # Check the state
-        line, name = get_top_frame_info()
+        line, name = get_top_frame_info(ts, thread_id=1)
         assert line == bpline + 1
         assert name == "print_hamlet"
 
@@ -137,7 +143,7 @@ def test_step(setup_teardown, hostapp_args):  # noqa: F811
         resp = ts.send_request(rq)
         assert resp.success
         # Check the state
-        _, name = get_top_frame_info()
+        _, name = get_top_frame_info(ts, thread_id=1)
         assert name == "main"
 
 

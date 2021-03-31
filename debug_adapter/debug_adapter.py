@@ -83,6 +83,7 @@ class DebugAdapter:
         self._cmd_exec = CommandProcessor(self, self.__write_queue, self.args)
         self.__read_from = None
         self.__write_to = None
+        self.__source_bps = {}
         # === protected stuff
         self._gdb = gdb_inst  # type: dbg.GdbEspXtensa or dbg.Gdb
         self._oocd = oocd_inst  # type: dbg.Oocd
@@ -420,19 +421,29 @@ class DebugAdapter:
         v = self._gdb.get_local_variables(no_values=False)
         return v
 
-    def break_add(self, src_line, condition=''):
+    def source_break_add(self, src, line, condition=''):
         """
         Breakpoint setting
 
         Parameters
         ----------
         condition : str
-        src_line : str
+        src : str
+        line : int
         """
-        return self._gdb.add_bp(src_line, ignore_count=0, cond=condition)
+        bp_num = self._gdb.add_bp("{}:{}".format(src, line), ignore_count=0, cond=condition)
+        if src not in self.__source_bps:
+            self.__source_bps[src] = {}
+        assert bp_num not in self.__source_bps[src]
+        self.__source_bps[src][bp_num] = (line, condition)
+        return bp_num
 
-    def break_removeall(self):
-        return self._gdb.delete_bp("")
+    def source_break_removeall(self, source_path):
+        if source_path not in self.__source_bps:
+            return
+        for bp_num in self.__source_bps[source_path]:
+            self._gdb.delete_bp(bp_num)
+        self.__source_bps.pop(source_path)
 
     def is_stopped(self):
         """

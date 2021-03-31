@@ -606,21 +606,22 @@ class CommandProcessor(object):
         """
         def try_set_once(source_path, line, condition):
             try:
-                return self.da.break_add("%s:%s" % (source_path, line), condition=condition)
+                return self.da.source_break_add(source_path, line, condition=condition)
             except Exception as e:
                 raise e
 
+        kwargs = {'body': schema.SetBreakpointsResponseBody([])}
+        success = False
         if self.da.args.postmortem:
-            kwargs = {'body': schema.SetBreakpointsResponseBody([])}
             response = base_schema.build_response(request, kwargs)
-            response.success = False
+            response.success = success
             self.write_message(response)
             self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
         else:
             # TODO add logpoints
             bps = request.arguments.breakpoints  # type: list[dict]
             source = request.arguments.source
-            self.da.break_removeall()  # clear old ones
+            self.da.source_break_removeall(source.path)  # clear old ones
 
             for bp in bps:
                 src_line = bp.get('line')
@@ -637,8 +638,6 @@ class CommandProcessor(object):
                         break
                     except Exception as e:
                         log.debug_exception(e)
-                        kwargs = {'body': schema.SetBreakpointsResponseBody([])}
-                        success = False
 
             response = base_schema.build_response(request, kwargs)
             response.success = success
