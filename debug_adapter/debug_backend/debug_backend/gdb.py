@@ -152,36 +152,40 @@ class Gdb(object):
             r_list = [str(i.get('message')) for i in response]
             return is_sublist(response_on_success, r_list)
 
-        with self._gdbmi_lock:
-            self._logger.debug('MI->: %s', cmd)
-            response = []
-            end = time.time()
-            if tmo:
-                end += tmo * self.tmo_scale_factor
-                done = False
-                try:
-                    self._gdbmi.write(cmd, read_response=False)
-                    while time.time() <= end and not done:  # while time is not up
-                        r = self._gdbmi.get_gdb_response(timeout_sec=0, raise_error_on_timeout=False)
-                        response += r
-                        done = _mi_cmd_isdone(response, response_on_success)
-                except Exception as e:
-                    self._gdbmi.verify_valid_gdb_subprocess()
+        response = []
+        end = time.time()
+        # lock_tmo = end - curr_time if end > curr_time else 0
+        if tmo is not None:
+            end += tmo * self.tmo_scale_factor
+            if not self._gdbmi_lock.acquire(timeout=tmo*self.tmo_scale_factor):
+                raise DebuggerTargetStateTimeoutError("Failed to wait for GDB/MI to become ready!")
+            done = False
+            try:
+                self._gdbmi.write(cmd, read_response=False)
+                while time.time() <= end and not done:  # while time is not up
+                    r = self._gdbmi.get_gdb_response(timeout_sec=0, raise_error_on_timeout=False)
+                    response += r
+                    done = _mi_cmd_isdone(response, response_on_success)
+            except Exception as e:
+                self._gdbmi.verify_valid_gdb_subprocess()
+        else:
+            self._gdbmi_lock.acquire()
+            while len(response) == 0:
+                response = self._gdbmi.write(cmd, raise_error_on_timeout=False)
+        self._logger.debug('MI<-:\n%s', pformat(response))
+        res, res_body = self._parse_mi_resp(response, new_target_state)  # None, None if empty
+        while not res:
+            # check for result report from GDB
+            response = self._gdbmi.get_gdb_response(0, raise_error_on_timeout=False)
+            if not len(response):
+                if tmo is not None and (time.time() >= end):
+                    self._gdbmi_lock.release()
+                    raise DebuggerTargetStateTimeoutError(
+                        'Failed to wait for completion of command "%s" / %s!' % (cmd, tmo * self.tmo_scale_factor))
             else:
-                while len(response) == 0:
-                    response = self._gdbmi.write(cmd, raise_error_on_timeout=False)
-            self._logger.debug('MI<-:\n%s', pformat(response))
-            res, res_body = self._parse_mi_resp(response, new_target_state)  # None, None if empty
-            while not res:
-                # check for result report from GDB
-                response = self._gdbmi.get_gdb_response(0, raise_error_on_timeout=False)
-                if not len(response):
-                    if tmo and (time.time() >= end):
-                        raise DebuggerTargetStateTimeoutError(
-                            'Failed to wait for completion of command "%s" / %s!' % (cmd, tmo * self.tmo_scale_factor))
-                else:
-                    self._logger.debug('MI<-:\n%s', pformat(response))
-                    res, res_body = self._parse_mi_resp(response, new_target_state)  # None, None if empty
+                self._logger.debug('MI<-:\n%s', pformat(response))
+                res, res_body = self._parse_mi_resp(response, new_target_state)  # None, None if empty
+        self._gdbmi_lock.release()
         return res, res_body
 
     def stream_handler_add(self, stream_type, handler):
@@ -490,19 +494,20 @@ class Gdb(object):
         -------
         stop_reason : int
         """
-        with self._gdbmi_lock:
-            end = time.time()
-            if tmo is not None:
-                end += tmo * self.tmo_scale_factor
-            while self._target_state != state:
-                if len(self._resp_cache):
-                    recs = []  # self._resp_cache
-                else:
-                    # check for target state change report from GDB
-                    recs = self._gdbmi.get_gdb_response(0.5, raise_error_on_timeout=False)
-                    if tmo and len(recs) == 0 and time.time() >= end:
-                        raise DebuggerTargetStateTimeoutError("Failed to wait for target state %d!" % state)
-                self._parse_mi_resp(recs, state)
+        end = curr_time = time.time()
+        if tmo is not None:
+            end += tmo * self.tmo_scale_factor
+        while self._target_state != state:
+            lock_tmo = end - curr_time if end > curr_time else 0
+            if not self._gdbmi_lock.acquire(timeout=lock_tmo):
+                raise DebuggerTargetStateTimeoutError("Failed to wait for target state %d! Current state %d" % (state, self._target_state))
+            # check for target state change report from GDB
+            recs = self._gdbmi.get_gdb_response(0.5, raise_error_on_timeout=False)
+            self._parse_mi_resp(recs, state)
+            self._gdbmi_lock.release()
+            curr_time = time.time()
+            if tmo is not None and curr_time >= end:
+                raise DebuggerTargetStateTimeoutError("Failed to wait for target state %d! Current state %d" % (state, self._target_state))
         return self._target_stop_reason
 
     def get_target_state(self):
