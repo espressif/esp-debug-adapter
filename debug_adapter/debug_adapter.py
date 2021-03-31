@@ -25,6 +25,7 @@
 import os
 import socket
 import tempfile
+import threading
 from datetime import datetime
 
 # noinspection PyCompatibility
@@ -37,7 +38,7 @@ from . import schema
 from . import log
 from .command_processor import CommandProcessor
 from .internal_classes import DaOpenOcdModes, DaDevModes, DaRunState, DaStates, DaArgs
-from .threads import ReaderThread, WriterThread, TargetPollerThread
+from .threads import ReaderThread, WriterThread
 from .tools import sys, PY2, ObjFromDict, WIN32, path_disassemble
 
 A2VSC_STARTED_STRING = "DEBUG_ADAPTER_STARTED"
@@ -91,7 +92,7 @@ class DebugAdapter:
         # === public stuff:
         self.reader = None  # type: Any(ReaderThread,None)
         self.writer = None  # type: Any(WriterThread,None)
-        self.target_poller = None  # type: Any(TargetPollerThread,None)
+        self.target_poller = None  # type: Any(threding.Timer,None)
         self.threads = []  # type: List[schema.Thread]
         self.thread_selected = None  # type: Any(int,None)
         self.frame_id_selected = None  # type: Any(int,None)
@@ -241,8 +242,8 @@ class DebugAdapter:
         self.state.general_state = DaRunState.STOP_PREPARATION
 
         try:
-            log.debug('Stopping of the Target poller thread')
-            self.target_poller.stop(blocking=True)
+            log.debug('Stopping target poller')
+            self.stop_target_poller()
             self.target_poller = None
         except Exception as e:
             log.warning(e)
@@ -293,7 +294,6 @@ class DebugAdapter:
                     self.__read_from = sys.stdin.buffer
             self.reader = ReaderThread(self.__read_from, self._cmd_exec)
             self.writer = WriterThread(self.__write_to, self.__write_queue)
-            self.target_poller = TargetPollerThread(1, self)
             self.state.general_state = DaRunState.CONNECTED
         else:
             log.debug('Already connected')
@@ -361,7 +361,7 @@ class DebugAdapter:
         Sent an interrupt signal to target
         """
         state, rsn = self._gdb.get_target_state()
-        # print 'DebuggerTestAppTests.LOAD_APP %s / %s' % (cls, app_bins)
+        log.debug("Target state %d" % state)
         if state != dbg.TARGET_STATE_STOPPED:
             self._gdb.exec_interrupt()
             rsn = self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 5)
@@ -575,6 +575,43 @@ class DebugAdapter:
         except Exception as e:
             log.debug(e)
 
+    def start_target_poller(self, state):
+        self.state.wait_target_state = state
+        self.target_poller = threading.Timer(1.0, self.poll_target, args=[
+            self,
+        ])
+        self.target_poller.start()
+
+    def stop_target_poller(self):
+        if self.state.wait_target_state == dbg.TARGET_STATE_UNKNOWN:
+            return
+        self.state.wait_target_state = dbg.TARGET_STATE_UNKNOWN
+        self.target_poller.cancel()
+        self.target_poller.join()
+
+    def poll_target(self, *kwargs):
+        log.debug("Poll target. Wait state %s" % self.state.wait_target_state)
+        if self.state.wait_target_state == dbg.TARGET_STATE_STOPPED:
+            stopped, rsn_str = self.is_stopped()
+            if stopped:
+                self.state.wait_target_state = dbg.TARGET_STATE_UNKNOWN
+                self._cmd_exec.generate_StoppedEvent(reason=rsn_str, thread_id=0, all_threads_stopped=True)
+        elif self.state.wait_target_state == dbg.TARGET_STATE_RUNNING:
+            # this is not fully implemented yet, need to define when we need to start waiting for target get running
+            try:
+                self._gdb.wait_target_state(dbg.TARGET_STATE_RUNNING, 0)
+                self.state.wait_target_state = dbg.TARGET_STATE_UNKNOWN
+                self._cmd_exec.generate_ContinuedEvent(thread_id=0, all_threads_continued=True)
+            except dbg.DebuggerTargetStateTimeoutError:
+                pass
+        if self.state.wait_target_state != dbg.TARGET_STATE_UNKNOWN:
+            log.debug("Poll target restart")
+            # restart timer if we still need to wait for target state
+            self.target_poller = threading.Timer(1.0, self.poll_target, args=[
+                self,
+            ])
+            self.target_poller.start()
+
     def threads_analysis(self, force_upd=False):
         """
         Should be launched after DebugAdapter.get_threads(). It separated of the last one for possibility to insert
@@ -675,13 +712,12 @@ class DebugAdapter:
         state, rsn = self._gdb.get_target_state()
         if state != dbg.TARGET_STATE_RUNNING:
             if loc:
-                pc = self._gdb.get_reg('pc')
-                log.debug('Resume from addr 0x%x' % pc)
+                log.debug('Resume from addr 0x%x' % int(loc))
                 self._gdb.exec_jump(loc)
             else:
                 self._gdb.exec_continue()
             self._gdb.wait_target_state(dbg.TARGET_STATE_RUNNING, 5)
-        self.target_poller.run(dbg.TARGET_STATE_STOPPED)
+        self.start_target_poller(dbg.TARGET_STATE_STOPPED)
 
     def run(self, start=False):
         """
