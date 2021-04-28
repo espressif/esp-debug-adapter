@@ -184,19 +184,12 @@ class CommandProcessor(object):
         request: schema.RestartRequest
         """
         response = base_schema.build_response(request)
-        self.write_message(response)
-        for th in self.da.threads:
+        for th in self.da.get_thread_list():
             id = th.get('id')
             self.generate_ThreadEvent(thread_id=int(id), reason='exited')
+        self.da.gdb_restart()
         self.da.start()
-        self.da.get_threads()
-        self.da.threads_analysis(force_upd=True)
-        for th in self.da.threads:
-            id = th.get('id')
-            self.generate_StoppedEvent(reason='pause',
-                                       thread_id=int(id),
-                                       all_threads_stopped=True,
-                                       preserve_focus_hint=True)
+        self.write_message(response)
 
     def on_continue_request(self, request):
         """

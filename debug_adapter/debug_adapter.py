@@ -345,16 +345,16 @@ class DebugAdapter:
         """
         Stops than starts gdb process with the same settings
         """
+        self.stop_target_poller()
         self.stop_gdb()
+        self._gdb = None
         self.start_gdb()
-
-    def relaunch_app(self):
-        """
-        Interrupts the target, then resets it
-        """
-        self._gdb.exec_interrupt()
-        self._gdb.target_reset()
-        self.resume_exec()
+        old_bps = self.__source_bps
+        self.__source_bps = {}
+        for src in old_bps:
+            for bpnum in old_bps[src]:
+                line, cond = old_bps[src][bpnum]
+                self.source_break_add(src, line, cond)
 
     def pause(self):
         """
