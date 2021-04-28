@@ -37,19 +37,31 @@ def build_setbp_request(path, bps):
     })
     return rq
 
-def continue_till_stopped(ts, stop_reason, timeout=5):
+
+def set_breakpoints(ts, path, bps):
+    rq = build_setbp_request(path, bps)
+    resp = ts.send_request(rq)
+    assert resp.success
+
+
+def continue_till_stopped(ts, stop_reason, thread_id=None, timeout=5):
     rq = schema.ContinueRequest(arguments=schema.ContinueArguments(0))
     resp = ts.send_request(rq)
     assert resp.success
 
-    expectation = timeline.Event(event="stopped", body=some.dict.containing({"reason": stop_reason}))
+    expect_body = {"reason": stop_reason}
+    if thread_id is not None:
+        expect_body['threadId'] = thread_id
+    expectation = timeline.Event(event="stopped", body=some.dict.containing(expect_body))
     result = ts.wait_for(expectation, timeout_s=timeout)
     assert result
+
 
 def get_stack_trace(ts, thread_id, start, num):
     rq = schema.StackTraceRequest(arguments=schema.StackTraceArguments(threadId=thread_id, startFrame=0, levels=20))
     resp = ts.send_request(rq)
     return resp.body.get("stackFrames")
+
 
 def get_top_frame_info(ts, thread_id):
     stack = get_stack_trace(ts, thread_id, 0, 1)

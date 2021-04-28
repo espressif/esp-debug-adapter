@@ -8,4 +8,4 @@ test_app_srcs = [
 ]
 test_app_out = HERE / "host" / "test_app"
 
-os.system("gcc -O0 -g %s -o %s" % (' '.join(str(e) for e in test_app_srcs), str(test_app_out)))
+os.system("gcc -O0 -g -pthread %s -o %s" % (' '.join(str(e) for e in test_app_srcs), str(test_app_out)))
