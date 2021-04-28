@@ -88,6 +88,7 @@ class DaStates(object):
     start_time = None  # type: Union[str, None]
     wait_target_state = dbg.TARGET_STATE_UNKNOWN
 
+
 class DaArgs(object):
     """
     Contains mandatory set of Da arguments. Can be extended with **kwargs

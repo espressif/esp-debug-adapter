@@ -26,6 +26,7 @@ import os
 import socket
 import tempfile
 import threading
+import copy
 from datetime import datetime
 
 # noinspection PyCompatibility
@@ -34,7 +35,6 @@ from typing import List, Any, IO, AnyStr
 from pprint import pformat
 
 from . import debug_backend as dbg
-from . import schema
 from . import log
 from .command_processor import CommandProcessor
 from .internal_classes import DaOpenOcdModes, DaDevModes, DaRunState, DaStates, DaArgs
@@ -85,15 +85,15 @@ class DebugAdapter:
         self.__read_from = None
         self.__write_to = None
         self.__source_bps = {}
+        self.__threads_lock = threading.Lock()
+        self.__threads = []  # type: List
         # === protected stuff
         self._gdb = gdb_inst  # type: dbg.GdbEspXtensa or dbg.Gdb
         self._oocd = oocd_inst  # type: dbg.Oocd
-        self._thread_cache = []  # old thread states
         # === public stuff:
         self.reader = None  # type: Any(ReaderThread,None)
         self.writer = None  # type: Any(WriterThread,None)
-        self.target_poller = None  # type: Any(threding.Timer,None)
-        self.threads = []  # type: List[schema.Thread]
+        self.target_poller = None  # type: Any(threading.Timer,None)
         self.thread_selected = None  # type: Any(int,None)
         self.frame_id_selected = None  # type: Any(int,None)
 
@@ -445,6 +445,18 @@ class DebugAdapter:
             self._gdb.delete_bp(bp_num)
         self.__source_bps.pop(source_path)
 
+    def _gdb2dap_reason(self, rsn):
+        if rsn == dbg.TARGET_STOP_REASON_BP:
+            return 'breakpoint'
+        elif rsn == dbg.TARGET_STOP_REASON_STEPPED:
+            return 'stepped'
+        elif rsn == dbg.TARGET_STOP_REASON_SIGINT:
+            return 'pause'
+        elif rsn == dbg.TARGET_STOP_REASON_FN_FINISHED:
+            return 'entry'
+        else:
+            return 'exception'
+
     def is_stopped(self):
         """
         Returns
@@ -456,16 +468,7 @@ class DebugAdapter:
         """
         try:
             r = self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 0)
-            if r == dbg.TARGET_STOP_REASON_BP:
-                return True, 'breakpoint'
-            elif r == dbg.TARGET_STOP_REASON_STEPPED:
-                return True, 'stepped'
-            elif r == dbg.TARGET_STOP_REASON_SIGINT:
-                return True, 'pause'
-            elif r == dbg.TARGET_STOP_REASON_FN_FINISHED:
-                return True, 'entry'
-            else:
-                return True, 'exception'
+            return True, r
         except dbg.DebuggerTargetStateTimeoutError:
             return False, ''
 
@@ -575,64 +578,75 @@ class DebugAdapter:
         except Exception as e:
             log.debug(e)
 
+    def on_target_stopped(self, rsn):
+        self.update_threads()
+        self._cmd_exec.generate_StoppedEvent(reason=self._gdb2dap_reason(rsn),
+                                             thread_id=int(self.thread_selected),
+                                             all_threads_stopped=self.state.threads_are_stopped)
+
     def start_target_poller(self, state):
         self.state.wait_target_state = state
-        self.target_poller = threading.Timer(1.0, self.poll_target, args=[
+        self.target_poller = threading.Timer(0.1, self.poll_target, args=[
             self,
         ])
         self.target_poller.start()
 
     def stop_target_poller(self):
-        if self.state.wait_target_state == dbg.TARGET_STATE_UNKNOWN:
-            return
         self.state.wait_target_state = dbg.TARGET_STATE_UNKNOWN
-        self.target_poller.cancel()
-        self.target_poller.join()
+        if self.target_poller and self.target_poller.is_alive():
+            self.target_poller.cancel()
+            self.target_poller.join()
 
     def poll_target(self, *kwargs):
         log.debug("Poll target. Wait state %s" % self.state.wait_target_state)
         if self.state.wait_target_state == dbg.TARGET_STATE_STOPPED:
-            stopped, rsn_str = self.is_stopped()
+            stopped, rsn = self.is_stopped()
             if stopped:
+                self.on_target_stopped(rsn)
                 self.state.wait_target_state = dbg.TARGET_STATE_UNKNOWN
-                self._cmd_exec.generate_StoppedEvent(reason=rsn_str, thread_id=0, all_threads_stopped=True)
         elif self.state.wait_target_state == dbg.TARGET_STATE_RUNNING:
             # this is not fully implemented yet, need to define when we need to start waiting for target get running
             try:
                 self._gdb.wait_target_state(dbg.TARGET_STATE_RUNNING, 0)
-                self.state.wait_target_state = dbg.TARGET_STATE_UNKNOWN
                 self._cmd_exec.generate_ContinuedEvent(thread_id=0, all_threads_continued=True)
+                self.state.wait_target_state = dbg.TARGET_STATE_UNKNOWN
             except dbg.DebuggerTargetStateTimeoutError:
                 pass
         if self.state.wait_target_state != dbg.TARGET_STATE_UNKNOWN:
             log.debug("Poll target restart")
             # restart timer if we still need to wait for target state
-            self.target_poller = threading.Timer(1.0, self.poll_target, args=[
+            self.target_poller = threading.Timer(0.1, self.poll_target, args=[
                 self,
             ])
             self.target_poller.start()
 
-    def threads_analysis(self, force_upd=False):
-        """
-        Should be launched after DebugAdapter.get_threads(). It separated of the last one for possibility to insert
-        a response for a request method (positive or negative) before starting to to find a changes (if we have they).
+    def get_thread_list(self):
+        with self.__threads_lock:
+            # return a copy of list because thread list can be modified asynchronously by other execution threads
+            return copy.deepcopy(self.__threads)
 
-        Parameters
-        ----------
-        force_upd : bool
+    def update_threads(self):
         """
-        def are_all_stopped(threads):
-            for t in threads:
+        Read threads existing on target
+        """
+        # raise exception if target is not stopped
+        # TODO: do we actually need target to be stopped?
+        # self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 0)
+        state, _ = self._gdb.get_target_state()
+        if state != dbg.TARGET_STATE_STOPPED:
+            raise RuntimeError("Can not update threads in not STOPPED mode!")
+        gdb_resp = self._gdb.get_thread_info()
+        # this method can be called from different execution threads:
+        # main DAP request processing loop and GDB target state notifier,
+        # so need to lock access to it
+        with self.__threads_lock:
+            self.thread_selected = int(gdb_resp[0])
+            self.__threads = gdb_resp[1]
+            self.state.threads_are_stopped = True
+            for t in self.__threads:
                 if t['state'] != "stopped":
-                    return False
-            return True
-
-        if (self.threads != self._thread_cache) or force_upd:  # changes!!!
-            # === processing
-            self.state.threads_are_stopped = are_all_stopped(self.threads)
-            # === finalizing:
-            self._thread_cache = self.threads
-            self.state.threads_updated = False
+                    self.state.threads_are_stopped = False
+                    break
 
     def set_variable(self, name, value):
         """
@@ -673,24 +687,6 @@ class DebugAdapter:
         """
         return self._gdb.console_cmd_run(cmd)
 
-    def get_threads(self):
-        """
-        Read threads exists on target
-        """
-        try_num = 0
-        while try_num < 3:
-            try:
-                self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 10)
-                gdb_resp = self._gdb.get_thread_info()
-                self.thread_selected = int(gdb_resp[0])
-                self.threads = gdb_resp[1]
-                self.state.threads_updated = True
-                return True
-            except dbg.DebuggerTargetStateTimeoutError as e:
-                log.debug(e)
-                try_num += 1
-        return False
-
     def stop_exec(self):
         """ Stops target execution and ensures that it is in STOPPED state
         """
@@ -709,7 +705,7 @@ class DebugAdapter:
         loc : str
             Location to which pc will jump before executing 'continue'
         """
-        state, rsn = self._gdb.get_target_state()
+        state, _ = self._gdb.get_target_state()
         if state != dbg.TARGET_STATE_RUNNING:
             if loc:
                 log.debug('Resume from addr 0x%x' % int(loc))
@@ -723,16 +719,20 @@ class DebugAdapter:
         """
         Runs a target program execution. If start==True set breakpoint at main_func if specified
         """
-        state, rsn = self._gdb.get_target_state()
+        state, _ = self._gdb.get_target_state()
         if state == dbg.TARGET_STATE_RUNNING:
             self.pause()
-        if not self.args.postmortem:
+        if self.args.postmortem:
+            # do not run in postmortem mode, just update threads list
+            self.update_threads()
+        else:
             if self.args.cmdfile:  # if a custom startup file specified, execute only it
                 self._gdb.exec_run(only_startup=True, startup_tmo=0)
             else:
                 self._gdb.exec_run()
             if start:
-                self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 10)
+                rsn = self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 10)
+                self.on_target_stopped(rsn)
 
     def start(self):
         self.run(start=True)

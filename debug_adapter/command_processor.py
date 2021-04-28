@@ -55,26 +55,6 @@ class CommandProcessor(object):
         except Exception as e:
             log.debug_exception(e)
 
-    def is_stopped_check(self):
-        """
-        Returns
-        -------
-        bool
-            True - target is stopped, False - not
-        """
-        # https://microsoft.github.io/debug-adapter-protocol/specification#Events_Stopped
-        st, rsn = self.da.is_stopped()
-        if st:
-            stop_response_body = schema.StoppedEventBody(reason='pause',
-                                                         description='Stopped by pause request',
-                                                         threadId=0,
-                                                         allThreadsStopped=True)
-            stop_response = schema.StoppedEvent(body=stop_response_body)
-            self.write_message(stop_response)
-            return True
-        else:
-            return False
-
     def on_initialize_request(self, request):
         """
 
@@ -361,8 +341,7 @@ class CommandProcessor(object):
             return
         # === working:
         try:
-            self.da.get_threads()
-            thr_list = compose_list_for_body(self.da.threads)
+            thr_list = compose_list_for_body(self.da.get_thread_list())
             success = True  # type: bool
             message = None
             # kwargs = {'body': schema.ThreadsResponseBody(thr_list)}
@@ -371,23 +350,12 @@ class CommandProcessor(object):
             success = False  # type: bool
             message = log.debug_exception(e)
             kwargs = {'body': None}
-            # self.da.get_threads()
 
         kwargs = {'body': schema.ThreadsResponseBody(thr_list)}
         threads_response = base_schema.build_response(request, kwargs)
         threads_response.success = success
         threads_response.message = message
         self.write_message(threads_response)
-        self.da.threads_analysis()
-        if self.da.thread_selected is not None:
-            selected_num = self.da.thread_selected
-        else:
-            selected_num = 0
-        if self.da.state.threads_are_stopped:
-            self.generate_StoppedEvent(reason='breakpoint',
-                                       thread_id=int(self.da.threads[selected_num - 1]['id']),
-                                       all_threads_stopped=True)
-        self.da.state.threads_are_stopped = None
 
     def on_stackTrace_request(self, request):
         """

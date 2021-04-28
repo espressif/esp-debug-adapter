@@ -25,10 +25,8 @@
 import threading
 import json
 import itertools
-from time import sleep
 from . import base_schema, log
 from .tools import PY3
-from . import debug_backend as dbg
 
 if PY3:
     _next_seq = itertools.count().__next__
