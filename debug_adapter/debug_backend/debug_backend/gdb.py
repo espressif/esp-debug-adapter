@@ -152,6 +152,7 @@ class Gdb(object):
             r_list = [str(i.get('message')) for i in response]
             return is_sublist(response_on_success, r_list)
 
+        self._logger.debug('MI->: %s', cmd)
         response = []
         end = time.time()
         # lock_tmo = end - curr_time if end > curr_time else 0
@@ -497,7 +498,7 @@ class Gdb(object):
         end = curr_time = time.time()
         if tmo is not None:
             end += tmo * self.tmo_scale_factor
-        while self._target_state != state:
+        while True:
             lock_tmo = end - curr_time if end > curr_time else 0
             if not self._gdbmi_lock.acquire(timeout=lock_tmo):
                 raise DebuggerTargetStateTimeoutError("Failed to wait for target state %d! Current state %d" % (state, self._target_state))
@@ -505,6 +506,8 @@ class Gdb(object):
             recs = self._gdbmi.get_gdb_response(0.5, raise_error_on_timeout=False)
             self._parse_mi_resp(recs, state)
             self._gdbmi_lock.release()
+            if self._target_state == state:
+                break
             curr_time = time.time()
             if tmo is not None and curr_time >= end:
                 raise DebuggerTargetStateTimeoutError("Failed to wait for target state %d! Current state %d" % (state, self._target_state))
