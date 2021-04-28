@@ -206,6 +206,9 @@ class Gdb(object):
     def gdb_exit(self, tmo=5):
         """ -gdb-exit ~= quit """
         self._mi_cmd_run("-gdb-exit", response_on_success=["exit"], tmo=tmo)
+        with self._gdbmi_lock:
+            self._gdbmi.exit()
+            self._gdbmi = None
 
     def console_cmd_run(self, cmd, response_on_success=["done"], tmo=5):
         """
