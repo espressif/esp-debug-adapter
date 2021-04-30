@@ -24,15 +24,48 @@
 
 import pathlib
 from debug_adapter import schema
+import timeline
+from tests.patterns import some
 
 
-def build_setbp_request(path, line):
+def build_setbp_request(path, bps):
     if isinstance(path, pathlib.Path):
         path = str(path)
     rq = schema.SetBreakpointsRequest(arguments={
         "source": schema.Source(path=path),
-        "breakpoints": [{
-            "line": line
-        }],
+        "breakpoints": bps,
     })
     return rq
+
+
+def set_breakpoints(ts, path, bps):
+    rq = build_setbp_request(path, bps)
+    resp = ts.send_request(rq)
+    assert resp.success
+
+
+def continue_till_stopped(ts, stop_reason, thread_id=None, timeout=5):
+    rq = schema.ContinueRequest(arguments=schema.ContinueArguments(0))
+    resp = ts.send_request(rq)
+    assert resp.success
+
+    expect_body = {"reason": stop_reason}
+    if thread_id is not None:
+        expect_body['threadId'] = thread_id
+    expectation = timeline.Event(event="stopped", body=some.dict.containing(expect_body))
+    result = ts.wait_for(expectation, timeout_s=timeout)
+    assert result
+
+
+def get_stack_trace(ts, thread_id, start, num):
+    rq = schema.StackTraceRequest(arguments=schema.StackTraceArguments(threadId=thread_id, startFrame=0, levels=20))
+    resp = ts.send_request(rq)
+    return resp.body.get("stackFrames")
+
+
+def get_top_frame_info(ts, thread_id):
+    stack = get_stack_trace(ts, thread_id, 0, 1)
+    assert len(stack) > 0
+    line = stack[0].get("line")
+    name = stack[0].get("name")
+    return line, name

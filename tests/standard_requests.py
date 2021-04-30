@@ -24,29 +24,27 @@
 
 from debug_adapter import schema
 
-REQUEST_INIT = schema.Request(command="initialize",
-                              arguments={
-                                  "adapterID": "espidf",
-                                  "clientID": "vscode",
-                                  "clientName": "Visual Studio Code",
-                                  "columnsStartAt1": True,
-                                  "linesStartAt1": True,
-                                  "locale": "en-us",
-                                  "pathFormat": "path",
-                                  "supportsRunInTerminalRequest": True,
-                                  "supportsVariablePaging": True,
-                                  "supportsVariableType": True
-                              })
+REQUEST_INIT = schema.InitializeRequest(arguments={
+                                        "adapterID": "espidf",
+                                        "clientID": "vscode",
+                                        "clientName": "Visual Studio Code",
+                                        "columnsStartAt1": True,
+                                        "linesStartAt1": True,
+                                        "locale": "en-us",
+                                        "pathFormat": "path",
+                                        "supportsRunInTerminalRequest": True,
+                                        "supportsVariablePaging": True,
+                                        "supportsVariableType": True
+                                        })
 
-REQUEST_LAUNCH = schema.Request(command="launch",
-                                arguments={
-                                    "__sessionId": "79b3673d-5b08-44e5-98ca-429a521464cb",
-                                    "externalConsole": False,
-                                    "logging": {
-                                        "engineLogging": True
-                                    },
-                                    "name": "Launch",
-                                    "preLaunchTask": "adapter",
-                                    "request": "launch",
-                                    "type": "espidf"
-                                })
+REQUEST_LAUNCH = schema.LaunchRequest(arguments={
+                                      "__sessionId": "79b3673d-5b08-44e5-98ca-429a521464cb",
+                                      "externalConsole": False,
+                                      "logging": {
+                                          "engineLogging": True
+                                      },
+                                      "name": "Launch",
+                                      "preLaunchTask": "adapter",
+                                      "request": "launch",
+                                      "type": "espidf"
+                                      })

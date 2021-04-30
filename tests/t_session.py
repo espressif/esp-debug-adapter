@@ -81,6 +81,7 @@ class TSession:
         self.client_busy = Lock()
 
     def __enter__(self):
+        log.info("================ Debug session ENTER: %s ================ " % self.session_name)
         self.session_start()
         return self
 
@@ -119,11 +120,20 @@ class TSession:
         if self._adapter_obj:
             disconnect_rq = schema.Request(command="disconnect", seq=-1, arguments={"restart": False})
             self.send_request(disconnect_rq, False)
-            self._adapter_obj.adapter_stop()
+            # give adapter time to cleanup
+            time.sleep(2.0)
         if self._client_stream and not self._client_stream._closed:
             self._client_stream.close()
         if self._client_socket and not self._client_socket._closed:
             self._client_socket.close()
+        # avoid errors due to unobserved responses and events
+        # TODO: avoid using 'TSession.wait_for' in tests. Instead of it,
+        # compose expected message sequences and use 'timeline.wait_until_realized'.
+        # Using that approach we will ensure that communication is done as expected and
+        # do not need to call `timeline.observe_all`
+        with self.session_timeline.frozen():
+            self.session_timeline.observe_all()
+        self.session_timeline.close()
 
     def start_client(self):
         self._client_socket = create_client()
@@ -153,6 +163,9 @@ class TSession:
         if wait_responce:
             while self._ongoing_request:
                 pass
+            assert request.command == self._last_response.command
+            # TODO: Enable check below, currently DebugAdapter does not reflect request_seq in responses
+            # assert self._ongoing_request.message.seq == self._last_response.request_seq
         return self._last_response
 
     def is_in_timeline(self, expectation):
@@ -160,9 +173,10 @@ class TSession:
             return expectation in self.session_timeline
 
     def wait_for(self, expectation, timeout_s=0):
-        end = time.process_time() + timeout_s
+        if timeout_s is not None:
+            end = time.process_time() + timeout_s
         while not self.is_in_timeline(expectation):
-            if timeout_s and (time.process_time() >= end):
+            if timeout_s is not None and (time.process_time() >= end):
                 return False
         return True
 
@@ -182,12 +196,13 @@ class TSession:
                             assert self._ongoing_request
                             response_msg = self._message_factory.response(new_json["command"], new_json.get("body", {}))
                             response_msg.seq = new_json["request_seq"]
+                            response_msg.request = self._ongoing_request.message
                             self._last_response = schema.Response(
                                 seq=response_msg.seq,
                                 request_seq=self._ongoing_request.seq,
                                 success=response_msg.success,
                                 body=response_msg.body,
-                                command=response_msg.request
+                                command=response_msg.request.command
                             )
                             self.session_timeline.record_response(self._ongoing_request, response_msg)
                             self._ongoing_request = None
@@ -195,7 +210,7 @@ class TSession:
                             log.warning("Unknown message: %s" % new_json)
                     else:
                         pass
-            except json.decoder.JSONDecodeError:
-                pass
+            except json.decoder.JSONDecodeError as e:
+                log.warning("Failed to decode JSON: %s!" % e)
             except messaging.NoMoreMessages:
                 pass

@@ -28,6 +28,7 @@ from enum import IntEnum
 # Some  other tools like flake8, language server of VSCode - Pylance  do not sopport it
 # and can consider imports unused. To bypass the warning message `noqa` comment is used.
 from typing import Tuple, Union  # noqa: F401
+from . import debug_backend as dbg
 
 
 class Modes(object):
@@ -85,6 +86,7 @@ class DaStates(object):
     # sets to False after the update processed (for example, stopEvent generated)
     error = False
     start_time = None  # type: Union[str, None]
+    wait_target_state = dbg.TARGET_STATE_UNKNOWN
 
 
 class DaArgs(object):

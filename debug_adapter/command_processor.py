@@ -55,26 +55,6 @@ class CommandProcessor(object):
         except Exception as e:
             log.debug_exception(e)
 
-    def is_stopped_check(self):
-        """
-        Returns
-        -------
-        bool
-            True - target is stopped, False - not
-        """
-        # https://microsoft.github.io/debug-adapter-protocol/specification#Events_Stopped
-        st, rsn = self.da.is_stopped()
-        if st:
-            stop_response_body = schema.StoppedEventBody(reason='pause',
-                                                         description='Stopped by pause request',
-                                                         threadId=0,
-                                                         allThreadsStopped=True)
-            stop_response = schema.StoppedEvent(body=stop_response_body)
-            self.write_message(stop_response)
-            return True
-        else:
-            return False
-
     def on_initialize_request(self, request):
         """
 
@@ -84,10 +64,15 @@ class CommandProcessor(object):
 
         """
         m = Measurement()
-        self.da.adapter_init()
-        self.generate_OutputEvent("Debug Adapter initialized\n")
-        # response
         response = base_schema.build_response(request)  # type: schema.InitializeResponse
+        try:
+            self.da.adapter_init()
+        except Exception:
+            response.success = False
+            response.message = "Failed to init Debug Adapter!"
+            self.write_message(response)
+            return
+        # response
         if self.da.args.postmortem:
             response.body.supportsConfigurationDoneRequest = True
             response.body.supportsRestartRequest = True
@@ -133,6 +118,7 @@ class CommandProcessor(object):
         self.write_message(response)
         # done event
         self.write_message(schema.InitializedEvent())
+        self.generate_OutputEvent("Debug Adapter initialized\n")
         if self.da.args.postmortem:
             self.da._gdb._target_state = 1
             self.generate_StoppedEvent(reason="exception",
@@ -198,19 +184,12 @@ class CommandProcessor(object):
         request: schema.RestartRequest
         """
         response = base_schema.build_response(request)
-        self.write_message(response)
-        for th in self.da.threads:
+        for th in self.da.get_thread_list():
             id = th.get('id')
             self.generate_ThreadEvent(thread_id=int(id), reason='exited')
+        self.da.gdb_restart()
         self.da.start()
-        self.da.get_threads()
-        self.da.threads_analysis(force_upd=True)
-        for th in self.da.threads:
-            id = th.get('id')
-            self.generate_StoppedEvent(reason='pause',
-                                       thread_id=int(id),
-                                       all_threads_stopped=True,
-                                       preserve_focus_hint=True)
+        self.write_message(response)
 
     def on_continue_request(self, request):
         """
@@ -355,8 +334,7 @@ class CommandProcessor(object):
             return
         # === working:
         try:
-            self.da.get_threads()
-            thr_list = compose_list_for_body(self.da.threads)
+            thr_list = compose_list_for_body(self.da.get_thread_list())
             success = True  # type: bool
             message = None
             # kwargs = {'body': schema.ThreadsResponseBody(thr_list)}
@@ -365,23 +343,12 @@ class CommandProcessor(object):
             success = False  # type: bool
             message = log.debug_exception(e)
             kwargs = {'body': None}
-            # self.da.get_threads()
 
         kwargs = {'body': schema.ThreadsResponseBody(thr_list)}
         threads_response = base_schema.build_response(request, kwargs)
         threads_response.success = success
         threads_response.message = message
         self.write_message(threads_response)
-        self.da.threads_analysis()
-        if self.da.thread_selected is not None:
-            selected_num = self.da.thread_selected
-        else:
-            selected_num = 0
-        if self.da.state.threads_are_stopped:
-            self.generate_StoppedEvent(reason='breakpoint',
-                                       thread_id=int(self.da.threads[selected_num - 1]['id']),
-                                       all_threads_stopped=True)
-        self.da.state.threads_are_stopped = None
 
     def on_stackTrace_request(self, request):
         """
@@ -606,21 +573,22 @@ class CommandProcessor(object):
         """
         def try_set_once(source_path, line, condition):
             try:
-                return self.da.break_add("%s:%s" % (source_path, line), condition=condition)
+                return self.da.source_break_add(source_path, line, condition=condition)
             except Exception as e:
                 raise e
 
+        kwargs = {'body': schema.SetBreakpointsResponseBody([])}
+        success = False
         if self.da.args.postmortem:
-            kwargs = {'body': schema.SetBreakpointsResponseBody([])}
             response = base_schema.build_response(request, kwargs)
-            response.success = False
+            response.success = success
             self.write_message(response)
             self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
         else:
             # TODO add logpoints
             bps = request.arguments.breakpoints  # type: list[dict]
             source = request.arguments.source
-            self.da.break_removeall()  # clear old ones
+            self.da.source_break_removeall(source.path)  # clear old ones
 
             for bp in bps:
                 src_line = bp.get('line')
@@ -637,8 +605,6 @@ class CommandProcessor(object):
                         break
                     except Exception as e:
                         log.debug_exception(e)
-                        kwargs = {'body': schema.SetBreakpointsResponseBody([])}
-                        success = False
 
             response = base_schema.build_response(request, kwargs)
             response.success = success
