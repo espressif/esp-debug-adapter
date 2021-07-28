@@ -3,21 +3,13 @@ import time
 from ..defs import *
 from ..utils import fixup_path
 from .xtensa import *
+from .riscv import *
 
 
-class OocdEspXtensa(OocdXtensa):
+class OocdEspImpl:
     """
-        Class to communicate to OpenOCD supporting ESP Xtensa-specific features
+        Class to communicate to OpenOCD supporting ESP-specific features
     """
-
-    def __init__(self, cores_num=1, oocd_exec=None, oocd_scripts=None, oocd_cfg_files=[], oocd_cfg_cmds=[],
-                 oocd_debug=2, oocd_args=[], host='127.0.0.1', log_level=None, log_stream_handler=None,
-                 log_file_handler=None):
-        super(OocdEspXtensa, self).__init__(oocd_exec=oocd_exec, oocd_scripts=oocd_scripts,
-                                            oocd_cfg_files=oocd_cfg_files, oocd_cfg_cmds=oocd_cfg_cmds,
-                                            oocd_debug=oocd_debug, oocd_args=oocd_args, host=host, log_level=log_level,
-                                            log_stream_handler=log_stream_handler, log_file_handler=log_file_handler)
-        self.cores_num = cores_num
 
     def set_appimage_offset(self, app_flash_off):
         self.cmd_exec('esp appimage_offset 0x%x' % app_flash_off)
@@ -66,6 +58,21 @@ class OocdEspXtensa(OocdXtensa):
             if not stopped and tmo and time.time() > end:
                 raise DebuggerError('Failed to wait for apptrace stop!')
 
+
+class OocdEspXtensa(OocdXtensa, OocdEspImpl):
+    """
+        Class to communicate to OpenOCD supporting ESP Xtensa-specific features
+    """
+
+    def __init__(self, cores_num=1, oocd_exec=None, oocd_scripts=None, oocd_cfg_files=[], oocd_cfg_cmds=[],
+                 oocd_debug=2, oocd_args=[], host='127.0.0.1', log_level=None, log_stream_handler=None,
+                 log_file_handler=None):
+        super(OocdEspXtensa, self).__init__(oocd_exec=oocd_exec, oocd_scripts=oocd_scripts,
+                                            oocd_cfg_files=oocd_cfg_files, oocd_cfg_cmds=oocd_cfg_cmds,
+                                            oocd_debug=oocd_debug, oocd_args=oocd_args, host=host, log_level=log_level,
+                                            log_stream_handler=log_stream_handler, log_file_handler=log_file_handler)
+        self.cores_num = cores_num
+
     def perfmon_dump(self, counter = None):
         """Run OpenOCD perfmon_dump command
 
@@ -100,17 +107,27 @@ class OocdEspXtensa(OocdXtensa):
         return result
 
 
-class GdbEspXtensa(GdbXtensa):
+class OocdEspRiscv(OocdRiscv, OocdEspImpl):
     """
-        Class to communicate to GDB supporting ESP Xtensa-specific features
+        Class to communicate to OpenOCD supporting ESP RISCV-specific features
     """
 
-    def __init__(self, gdb_path, remote_target='127.0.0.1:3333', extended_remote_mode=False, gdb_log_file=None,
-                 log_level=None, log_stream_handler=None, log_file_handler=None):
-        super(GdbEspXtensa, self).__init__(gdb_path=gdb_path, remote_target=remote_target,
-                                           extended_remote_mode=extended_remote_mode, gdb_log_file=gdb_log_file,
-                                           log_level=log_level, log_stream_handler=log_stream_handler,
-                                           log_file_handler=log_file_handler)
+    def __init__(self, cores_num=1, oocd_exec=None, oocd_scripts=None, oocd_cfg_files=[], oocd_cfg_cmds=[],
+                 oocd_debug=2, oocd_args=[], host='127.0.0.1', log_level=None, log_stream_handler=None,
+                 log_file_handler=None):
+        super(OocdEspRiscv, self).__init__(oocd_exec=oocd_exec, oocd_scripts=oocd_scripts,
+                                            oocd_cfg_files=oocd_cfg_files, oocd_cfg_cmds=oocd_cfg_cmds,
+                                            oocd_debug=oocd_debug, oocd_args=oocd_args, host=host, log_level=log_level,
+                                            log_stream_handler=log_stream_handler, log_file_handler=log_file_handler)
+        self.cores_num = cores_num
+
+
+class GdbEspImpl:
+    """
+        Class to communicate to GDB supporting ESP-specific features
+    """
+
+    def __init__(self):
         self.app_flash_offset = 0x10000  # default for for ESP xtensa chips
         self.prog_startup_cmdfile = os.path.join(DEFAULT_GDB_INIT_SCRIPT_DIR, "esp_init.gdb")
 
@@ -159,14 +176,6 @@ class GdbEspXtensa(GdbXtensa):
             self.add_bp(start_func, tmp=True)
         self.resume()
 
-    def get_thread_info(self, thread_id=None):
-        """
-            See Gdb.get_thread_info().
-            ESP xtensa chips need to be halted to read memory. This method stops
-        """
-        self.halt()
-        return super(GdbEspXtensa, self).get_thread_info(thread_id)
-
     def gcov_dump(self, on_the_fly=True):
         if on_the_fly:
             cmd = 'esp gcov'
@@ -188,6 +197,43 @@ class GdbEspXtensa(GdbXtensa):
 
     def apptrace_stop(self):
         self.monitor_run('esp apptrace stop')
+
+
+class GdbEspXtensa(GdbEspImpl, GdbXtensa):
+    """
+        Class to communicate to GDB supporting ESP Xtensa-specific features
+    """
+
+    def __init__(self, gdb_path, remote_target='127.0.0.1:3333', extended_remote_mode=False, gdb_log_file=None,
+                 log_level=None, log_stream_handler=None, log_file_handler=None):
+        GdbXtensa.__init__(self, gdb_path=gdb_path, remote_target=remote_target,
+                                           extended_remote_mode=extended_remote_mode, gdb_log_file=gdb_log_file,
+                                           log_level=log_level, log_stream_handler=log_stream_handler,
+                                           log_file_handler=log_file_handler)
+        GdbEspImpl.__init__(self)
+
+    def get_thread_info(self, thread_id=None):
+        """
+            See Gdb.get_thread_info().
+            ESP xtensa chips need to be halted to read memory. This method stops
+        """
+        self.halt()
+        return super(GdbEspXtensa, self).get_thread_info(thread_id)
+
+
+class GdbEspRiscv(GdbEspImpl, GdbRiscv):
+    """
+        Class to communicate to GDB supporting ESP RISCV-specific features
+    """
+
+    def __init__(self, gdb_path, remote_target='127.0.0.1:3333', extended_remote_mode=False, gdb_log_file=None,
+                 log_level=None, log_stream_handler=None, log_file_handler=None):
+        GdbRiscv.__init__(self, gdb_path=gdb_path, remote_target=remote_target,
+                                           extended_remote_mode=extended_remote_mode, gdb_log_file=gdb_log_file,
+                                           log_level=log_level, log_stream_handler=log_stream_handler,
+                                           log_file_handler=log_file_handler)
+        GdbEspImpl.__init__(self)
+
 
 class OocdEsp32(OocdEspXtensa):
     """
@@ -262,3 +308,27 @@ class GdbEsp32s2(GdbEspXtensa):
                                          gdb_log_file=gdb_log_file, log_level=log_level,
                                          log_stream_handler=log_stream_handler,
                                          log_file_handler=log_file_handler)
+
+
+class OocdEsp32c3(OocdEspRiscv):
+    """
+        Class to communicate to OpenOCD supporting ESP32-C3 specific features
+    """
+    chip_name = 'esp32c3'
+
+
+class GdbEsp32c3(GdbEspRiscv):
+    """
+        Class to communicate to GDB supporting ESP32-C3 specific features
+    """
+    chip_name = 'esp32c3'
+
+    def __init__(self, gdb_path='riscv32-esp-elf-gdb', remote_target='127.0.0.1:3333', extended_remote_mode=False,
+                 gdb_log_file=None, log_level=None, log_stream_handler=None, log_file_handler=None):
+        super(GdbEsp32c3, self).__init__(gdb_path=gdb_path, remote_target=remote_target,
+                                         extended_remote_mode=extended_remote_mode,
+                                         gdb_log_file=gdb_log_file, log_level=log_level,
+                                         log_stream_handler=log_stream_handler,
+                                         log_file_handler=log_file_handler)
+        # self.console_cmd_run('set arch riscv:rv32')
+        self.gdb_set('arch', 'riscv:rv32')
