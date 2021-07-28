@@ -1,18 +1,18 @@
-# ide and env dirs
+# Basic temporary extensions
+*.pyc
+*.tmp
+*.log
+
+# IDE, deployment folders and files
+/__pycache__
 /.idea
 /.venv
 /.vscode
-/.venv
-
-
-# temp folders
-/temp*
-/tmp
-
-# test generated files
-/tests/temp_sc_tests/gdbinit
-TEST*.xml
-
-# files
-*.pyc
-*.log
+/build
+/dist
+/docs
+/*.egg-info
+*.sublime-workspace
+/debug_backend/*.bak
+*/reports
+*bak

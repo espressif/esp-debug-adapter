@@ -1,6 +1,7 @@
 import os
 import subprocess
 import telnetlib
+import socket
 import threading
 import time
 import re
@@ -17,6 +18,8 @@ class Oocd(threading.Thread):
     GDB_PORT = 3333
     TELNET_PORT = 4444
     TCL_PORT = 6666
+    TCL_COMMAND_TOKEN = '\x1a'
+    TCL_BUFSZ = 4096
     chip_name = ''
 
     def __init__(self,
@@ -97,7 +100,23 @@ class Oocd(threading.Thread):
             self._tn = telnetlib.Telnet(host, self.TELNET_PORT, 5)
             self._tn.read_until(b'>', 5)
         except Exception as e:
-            self._logger.error('Failed to open telnet connection with OpenOCD (%s)!', e)
+            self._logger.error('Failed to open Telnet connection with OpenOCD (%s)!', e)
+            if e is EOFError and oocd_exec is not None:
+                if self._oocd_proc.stdout:
+                    out = self._oocd_proc.stdout.read()
+                    self._logger.debug(
+                        '================== OOCD OUTPUT START =================\n'
+                        '%s================== OOCD OUTPUT END =================\n',
+                        out)
+                self._oocd_proc.terminate()
+            raise e
+        # Open TCL connection to it
+        self._logger.debug('Open TCL conn to "%s"...', host)
+        try:
+            self._tcl_sock = socket.create_connection((host, self.TCL_PORT), timeout=5)
+        except Exception as e:
+            self._logger.error('Failed to open TCL connection with OpenOCD (%s)!', e)
+            self._tn.close()
             if e is EOFError and oocd_exec is not None:
                 if self._oocd_proc.stdout:
                     out = self._oocd_proc.stdout.read()
@@ -116,7 +135,12 @@ class Oocd(threading.Thread):
             self._logger.debug(ln.rstrip(' \r\n'))
 
     def stop(self):
-        self._logger.debug('Close telnet conn')
+        self._logger.debug('Close TCL conn')
+        try:
+            self._tcl_send("exit")
+        finally:
+            self._tcl_sock.close()
+        self._logger.debug('Close Telnet conn')
         self._tn.close()
         self._logger.debug('Stop OpenOCD')
         self.do_work = False
@@ -127,6 +151,36 @@ class Oocd(threading.Thread):
         if self._oocd_proc.stdout:
             self._oocd_proc.stdout.close()
         self._logger.debug('OOCD thread stopped')
+
+    def _tcl_send(self, cmd):
+        """Send a command string to TCL RPC. Return the result that was read."""
+        data = (cmd + self.TCL_COMMAND_TOKEN).encode("utf-8")
+        self._logger.debug('TCL ->: %s' % data)
+        self._tcl_sock.send(data)
+        return self._tcl_recv()
+
+    def _tcl_recv(self):
+        """Read from the stream until the token (\x1a) was received."""
+        data = bytes()
+        while True:
+            chunk = self._tcl_sock.recv(self.TCL_BUFSZ)
+            data += chunk
+            if bytes(self.TCL_COMMAND_TOKEN, encoding="utf-8") in chunk:
+                break
+        self._logger.debug('TCL <-: %s' % data)
+        data = data.decode("utf-8").strip()
+        data = data[:-1] # strip trailing \x1a
+        return data
+
+    def tcl_cmd_exec(self, cmd):
+        return self._tcl_send(cmd)
+
+    def targets(self):
+        targets = self.tcl_cmd_exec('target names')
+        return targets.split(' ')
+
+    def target_state(self, target):
+        return self.tcl_cmd_exec('%s curstate' % target)
 
     def cmd_exec(self, cmd):
         # read all output already sent
@@ -154,7 +208,7 @@ class Oocd(threading.Thread):
     # also can be used to parse output of the 'reg' command executed via GDB's 'monitor'
     def parse_reg_val(self, nm, res_str):
         # format: pc (/32): 0x400E4E72
-        tokens = re.match('%s[ \t]+\(/\d+\):[ \t]+(?P<val>0x[0-9a-fA-F]+)' % nm, res_str)
+        tokens = re.match(r'%s[ \t]+\(/\d+\):[ \t]+(?P<val>0x[0-9a-fA-F]+)' % nm, res_str)
         return int(tokens.group('val'), 0)
 
     def get_reg(self, nm):

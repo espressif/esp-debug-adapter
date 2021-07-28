@@ -6,15 +6,7 @@ verify_ssl = true
 [dev-packages]
 
 [packages]
-click = "*"
-future = ">=0.17"
-psutil = "*"
-pygdbmi = "*"
-pylint = "*"
-requests = "*"
-typing = "*"
-xmlrunner = "*"
-"backports.functools-lru-cache" = "*"
+pygdbmi = "==0.9.0.0"
 
 [requires]
-python_version = ">3.7"
+python_version = "3.7"

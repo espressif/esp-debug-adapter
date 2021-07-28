@@ -72,7 +72,8 @@ class Gdb(object):
             if 'reason' in rec['payload']:
                 if rec['payload']['reason'] == 'breakpoint-hit':
                     self._target_stop_reason = TARGET_STOP_REASON_BP
-                elif rec['payload']['reason'] == 'watchpoint-trigger':
+                elif rec['payload']['reason'] == 'watchpoint-trigger' or \
+                    rec['payload']['reason'] == 'access-watchpoint-trigger':
                     self._target_stop_reason = TARGET_STOP_REASON_WP
                     self._curr_wp_val = rec['payload']['value']
                 elif rec['payload']['reason'] == 'watchpoint-scope':
