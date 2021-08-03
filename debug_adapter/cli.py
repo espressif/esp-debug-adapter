@@ -55,6 +55,7 @@ h = {
     "--postmortem": "Run the adapter without target in \'read-only\' mode",
     "--oocd-scripts": 'Path to OpenOCD TCL scripts (use OPENOCD_SCRIPTS envvar by default)',
     "--cmdfile": 'Path to a command file containing commands to automatic execute during a program startup',
+    "--tmo-scale-factor": 'Scale factor for gdb timeout (default: 1)'
 }
 
 
@@ -88,6 +89,7 @@ INT_PREF = IntegerWithPrefix()
 @click.option('--debug', '-d', help=h['--debug'], type=INT_PREF, default=2, show_default=True)
 @click.option('--device-name', '-dn', help=h['--device-name'], type=Union[str], default=None, show_default=True)
 @click.option('--port', '-p', help=h['--port'], default=43474, show_default=True, type=INT_PREF)
+@click.option('--tmo-scale-factor', '-tsf', help=h["--tmo-scale-factor"], type=INT_PREF, default=1)
 #
 # Specific modes:
 @click.option('--postmortem', '-pm', help=h['--postmortem'], is_flag=True)

@@ -51,6 +51,7 @@ Options:
   -x, --cmdfile TEXT              Path to a command file containing commands
                                   to automatic execute during a program
                                   startup
+  -tsf, --tmo-scale-factor        Scale factor for gdb timeout [default:1]
   -o, --oocd TEXT                 Path to OpenOCD binary file, (used
                                   OPENOCD_BIN envvar or (if not set) 'openocd'
                                   by default)  [default: openocd]

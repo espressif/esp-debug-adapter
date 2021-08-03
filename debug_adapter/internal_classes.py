@@ -112,6 +112,7 @@ class DaArgs(object):
                  oocd="",
                  port=43474,
                  postmortem=False,
+                 tmo_scale_factor=1,
                  toolchain_prefix="",
                  **kwargs):
         """
@@ -120,6 +121,8 @@ class DaArgs(object):
         ----------
         app_flash_off: Union[int, None]
         board_type: str
+        cmdfile: str
+        core_file: Tuple[str]
         debug: int
         developer_mode: Union[str, None]
         device_name: str
@@ -134,9 +137,8 @@ class DaArgs(object):
         oocd_scripts: str
         port: int
         postmortem: bool
+        tmo_scale_factor: int
         toolchain_prefix: str
-        cmdfile: str
-        core_file: Tuple[str]
         """
         self.app_flash_off = app_flash_off
         self.board_type = board_type
@@ -157,6 +159,7 @@ class DaArgs(object):
         self.toolchain_prefix = toolchain_prefix
         self.postmortem = postmortem
         self.core_file = core_file
+        self.tmo_scale_factor = tmo_scale_factor
         # for key in kwargs:
         for key, value in kwargs.items():
             setattr(self, key, value)

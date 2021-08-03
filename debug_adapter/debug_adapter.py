@@ -50,6 +50,7 @@ class DebugAdapter:
     """
     Adapter class
     """
+
     def __init__(self, args, gdb_inst=None, oocd_inst=None):
         """
         Parameters
@@ -514,6 +515,7 @@ class DebugAdapter:
                                            gdb_log_file=os.path.join(tempfile.gettempdir(), "gdb_proc.log"),
                                            remote_target=remote_target)
                 log.debug("Created gdb object of type: %s" % self._gdb.__class__.__name__)
+                self._gdb.tmo_scale_factor = self.args.tmo_scale_factor
                 if isinstance(self.args.elfpath, str):
                     self._gdb.exec_file_set(self.args.elfpath)
                 else:
@@ -727,7 +729,7 @@ class DebugAdapter:
             self.update_threads()
         else:
             if self.args.cmdfile:  # if a custom startup file specified, execute only it
-                self._gdb.exec_run(only_startup=True, startup_tmo=0)
+                self._gdb.exec_run(only_startup=True, startup_tmo=5)
             else:
                 self._gdb.exec_run()
             if start:
