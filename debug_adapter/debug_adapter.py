@@ -23,6 +23,7 @@
 # SPDX-License-Identifier: MIT
 
 import os
+import os.path
 import socket
 import tempfile
 import threading
@@ -68,11 +69,13 @@ class DebugAdapter:
         self.start_time = datetime.now().strftime("%Y_%m_%d_%H-%M-%S")
         log.init(args, start_time_str=self.start_time, da_inst=self, no_debug_console=args.log_no_debug_console)
         if args.debug > 2:
-            import os
             log.info_no_con("Working directory: %s" % os.getcwd())
             log.info_no_con("Arguments: \n" + pformat(args.get_dict(), indent=4))
 
         self.args = args
+        _, self.target_triple = os.path.split(args.toolchain_prefix)
+        if self.target_triple.endswith('-'):
+            self.target_triple = self.target_triple[:-1]
 
         self.socket_server = None  # type: socket.socket
         self.socket_client = None  # type: socket.socket
@@ -508,7 +511,13 @@ class DebugAdapter:
                 else:
                     remote_target = None  # for the default value
 
+                gdb_path = None  # default GDB path will be used
+                if len(self.args.toolchain_prefix):
+                    # assume GDB path basing on toolchain prefix
+                    gdb_path = "{}gdb".format(self.args.toolchain_prefix)
                 self._gdb = dbg.create_gdb(chip_name=self.args.device_name,
+                                           target_triple=self.target_triple,
+                                           gdb_path=gdb_path,
                                            log_level=log.level,
                                            log_file_handler=log_file_handler,
                                            log_stream_handler=log.stream_handler,
@@ -548,6 +557,7 @@ class DebugAdapter:
             else:
                 log_file_handler = log.get_file_handler()
             self._oocd = dbg.create_oocd(chip_name=self.args.device_name,
+                                         target_triple=self.target_triple,
                                          oocd_exec=self.args.oocd,
                                          oocd_scripts=self.args.oocd_scripts,
                                          oocd_args=self.args.oocd_args,
