@@ -119,9 +119,7 @@ class DebugAdapter:
             self.socket_server.bind(('localhost', self.args.port))
             self.socket_server.listen(0)
 
-            hostname = socket.gethostname()
-            ip = socket.gethostbyname(hostname)
-            log.info("Listening on port " + str(self.args.port) + " (host: %s,local ip: %s)" % (hostname, ip))
+            log.info("Listening on port " + str(self.args.port))
             self.log_cmd(A2VSC_READY2CONNECT_STRING)
             self.state.general_state = DaRunState.READY_TO_CONNECT
             # this while is needed to make the adapter responsive to Ctrl+C during waiting for a connection.
