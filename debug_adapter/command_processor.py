@@ -67,11 +67,11 @@ class CommandProcessor(object):
         response = base_schema.build_response(request)  # type: schema.InitializeResponse
         try:
             self.da.adapter_init()
-        except Exception:
+        except Exception as e:
             response.success = False
             response.message = "Failed to init Debug Adapter!"
             self.write_message(response)
-            return
+            raise e
         # response
         if self.da.args.postmortem:
             response.body.supportsConfigurationDoneRequest = True
