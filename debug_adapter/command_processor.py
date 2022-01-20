@@ -67,11 +67,11 @@ class CommandProcessor(object):
         response = base_schema.build_response(request)  # type: schema.InitializeResponse
         try:
             self.da.adapter_init()
-        except Exception:
+        except Exception as e:
             response.success = False
             response.message = "Failed to init Debug Adapter!"
             self.write_message(response)
-            return
+            raise e
         # response
         if self.da.args.postmortem:
             response.body.supportsConfigurationDoneRequest = True
@@ -452,11 +452,11 @@ class CommandProcessor(object):
         if len(expression) > 6 and expression[:6] == "-exec ":
             cmd_output = ''
 
-            def get_output(output):
+            def get_output(type, stream, output):
                 nonlocal cmd_output
                 cmd_output += output
 
-            self.da._gdb.stream_handler_set('console', get_output)
+            self.da._gdb.stream_handler_add('console', get_output)
             self.da.gdb_execute(expression[6:])
             evaluate_response = base_schema.build_response(
                 request, kwargs={'body': {

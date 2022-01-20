@@ -35,14 +35,12 @@ h = {
     "--board-type": 'Type of the board to run tests on (you could use OOCD_TEST_BOARD envvar by default)',
     "--debug": 'Debug level (0-4), 5 - for a full OOCD log',
     "--developer-mode": 'Modes for development purposes',
-    "--device-name": 'The name of used hardware to debug (currently Esp32 or Esp32_S2). It defines '
-    '--toolchain-prefix',
+    "--device-name": 'The name of used hardware to debug (esp32, esp32s2, etc.).',
     "--port": "Listen on given port for VS Code connections",
     "--log-file": 'Path to log file.',
     "--log-mult-files": 'Log to separated files',
     "--log-no-debug-console": 'Turn off output to the debug console of the IDE',
-    "--toolchain-prefix": '(If not set, controlled by --device-name!) Toolchain prefix. If set, rewrites the value '
-    'specified by --device-name.',
+    "--toolchain-prefix": 'Toolchain prefix.',
     "--elfpath": 'A path to elf files for debugging. You can use several elf files e.g. `-e file1.elf -e '
     'file2.elf`',
     "--core-file": 'Use a file as a core dump to examine.',
