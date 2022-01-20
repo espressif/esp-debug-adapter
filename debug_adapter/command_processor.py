@@ -452,11 +452,11 @@ class CommandProcessor(object):
         if len(expression) > 6 and expression[:6] == "-exec ":
             cmd_output = ''
 
-            def get_output(output):
+            def get_output(type, stream, output):
                 nonlocal cmd_output
                 cmd_output += output
 
-            self.da._gdb.stream_handler_set('console', get_output)
+            self.da._gdb.stream_handler_add('console', get_output)
             self.da.gdb_execute(expression[6:])
             evaluate_response = base_schema.build_response(
                 request, kwargs={'body': {
