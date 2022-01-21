@@ -139,6 +139,7 @@ def cli(ctx, **kwargs):
         args_main.debug = 4
         args_main.port = 43474
         args_main.oocd_mode = DaOpenOcdModes.NO_OOCD
+        args_main.toolchain_prefix = ""
         args_main.log_file = "debug.log"
     # Real work starts here
     dbg_a = DebugAdapter(args=args_main)
