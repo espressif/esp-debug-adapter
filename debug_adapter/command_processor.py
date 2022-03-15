@@ -11,7 +11,7 @@ import json
 from queue import Queue
 from . import schema, base_schema, log
 from .tools import get_good_path, Measurement
-from .internal_classes import DaDevModes, DaRunState
+from .internal_classes import DaDevModes, DaRunState, DaVariableReference
 
 
 POST_MORTEM_MODE_NOTIFICATION = "---\n" \
@@ -31,6 +31,7 @@ class CommandProcessor(object):
     to post protocol messages (which will be converted with 'to_dict()' and will have the 'seq' updated as
     needed).
     """
+
     def __init__(self, dbg_adapter_inst, write_queue, args):
         self.da = dbg_adapter_inst
         self.write_queue = write_queue  # type: Queue
@@ -86,6 +87,9 @@ class CommandProcessor(object):
             response.body.supportsRestartRequest = True
             response.body.supportTerminateDebuggee = True
             response.body.supportsStepInTargetsRequest = True
+            response.body.supportsDisassembleRequest = True
+            response.body.supportsInstructionBreakpoints = True
+            response.body.supportsSteppingGranularity = True
             # Not supported features
             response.body.supportsFunctionBreakpoints = False
             response.body.supportsEvaluateForHovers = False
@@ -109,12 +113,9 @@ class CommandProcessor(object):
             response.body.supportsTerminateRequest = False
             response.body.supportsDataBreakpoints = False
             response.body.supportsReadMemoryRequest = False
-            response.body.supportsDisassembleRequest = False
             response.body.supportsCancelRequest = False
             response.body.supportsBreakpointLocationsRequest = False
             response.body.supportsClipboardContext = False
-            response.body.supportsSteppingGranularity = False
-            response.body.supportsInstructionBreakpoints = False
         self.write_message(response)
         # done event
         self.write_message(schema.InitializedEvent())
@@ -377,6 +378,7 @@ class CommandProcessor(object):
                 line=line,
                 column=0,
                 source=src,
+                instructionPointerReference=frame.get('addr')
             )
             stack_frames_list.append(sf.to_dict())  # to_dict because of a json encoding error
         kwargs = {
@@ -397,8 +399,9 @@ class CommandProcessor(object):
         scopes = self.da.get_scopes()
         for scope in scopes:
             scope_dap_obj = schema.Scope(name=scope['name'],
-                                         variablesReference=len(scope['vals_list']),
-                                         expensive=False)
+                                         variablesReference=int(scope['var_ref']),
+                                         expensive=False,
+                                         presentationHint=scope['p_hint'])
             scopes_for_body.append(scope_dap_obj.to_dict())
         # building a response:
         kwargs = {'body': schema.ScopesResponseBody(scopes=scopes_for_body)}
@@ -504,16 +507,22 @@ class CommandProcessor(object):
         """
         self.evaluated = False
         variables_for_body = []  # type: list[schema.Variable]
-        vars = self.da.get_vars(frame_id=self.da.frame_id_selected)
-        for v in vars:
-            # v_size = len(v['value'])
-            v_val = v['value']
-            # v_val_fu = str(v_val)
-            # else: # TODO think about variablesReference sizes
-            # if v_size > 1:
-            # variablesReference = len(v['value'])
-            v_dap_obj = schema.Variable(name=v['name'], value=v_val, variablesReference=0)
-            variables_for_body.append(v_dap_obj.to_dict())
+        if request.arguments.variableReference == DaVariableReference.LOCALS:
+            vars = self.da.get_vars(frame_id=self.da.frame_id_selected)
+            for v in vars:
+                # v_size = len(v['value'])
+                v_val = v['value']
+                # v_val_fu = str(v_val)
+                # else: # TODO think about variablesReference sizes
+                # if v_size > 1:
+                # variablesReference = len(v['value'])
+                v_dap_obj = schema.Variable(name=v['name'], value=v_val, variablesReference=0)
+                variables_for_body.append(v_dap_obj.to_dict())
+        elif request.arguments.variableReference == DaVariableReference.REGISTERS:
+            registers = self.da.get_registers()
+            for r in registers:
+                reg_dap_obj = schema.Variable(name=r['name'], value=r['value'], variablesReference=0)
+                variables_for_body.append(reg_dap_obj.to_dict())
         kwargs = {'body': schema.VariablesResponseBody(variables=variables_for_body)}
         response = base_schema.build_response(request, kwargs)
         self.write_message(response)
@@ -686,6 +695,37 @@ class CommandProcessor(object):
             self.write_message(response)
             if result:
                 self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
+
+    def on_disassemble_request(self, request):
+        """
+        Parameters
+        ----------
+        request : schema.DisassembleRequest
+        """
+        end_addr = int(request.arguments.memoryReference, 16) + \
+            (request.arguments.instructionCount + request.arguments.instructionOffset)
+
+        data, errors = self.da.get_disassemble_instructions(request.arguments.memoryReference, hex(end_addr))
+        kwargs = {'body': schema.DisassembleResponseBody(instructions=data)}
+        response = base_schema.build_response(request, kwargs)  # type: schema.DisassembleResponse
+        response.body.address = request.arguments.memoryReference
+        response.body.unreadableBytes = errors
+        response.success = True
+        self.write_message(response)
+
+    def on_setInstructionBreakpoints_request(self, request):
+        """
+        Parameters
+        ----------
+        request : schema.SetInstructionBreakpointsRequest
+        """
+        self.da.inst_break_removeall()
+        for ibp in request.arguments.breakpoints:
+            self.da.inst_break_add(ibp.get('instructionReference'), '')
+        kwargs = {'body': schema.SetInstructionBreakpointsResponseBody(breakpoints=request.arguments.breakpoints)}
+        response = base_schema.build_response(request, kwargs)
+        response.success = True
+        self.write_message(response)
 
     def write_message(self, protocol_message):
         """

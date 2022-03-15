@@ -5633,7 +5633,7 @@ class NextArguments(BaseSchema):
         if granularity is None:
             self.granularity = SteppingGranularity()
         else:
-            self.granularity = SteppingGranularity(**granularity) if granularity.__class__ !=  SteppingGranularity else granularity
+            self.granularity = SteppingGranularity(**kwargs) if granularity.__class__ !=  SteppingGranularity else granularity
         self.kwargs = kwargs
 
 
@@ -5857,7 +5857,7 @@ class StepInArguments(BaseSchema):
         if granularity is None:
             self.granularity = SteppingGranularity()
         else:
-            self.granularity = SteppingGranularity(**granularity) if granularity.__class__ !=  SteppingGranularity else granularity
+            self.granularity = SteppingGranularity(**kwargs) if granularity.__class__ !=  SteppingGranularity else granularity
         self.kwargs = kwargs
 
 
@@ -6068,7 +6068,7 @@ class StepOutArguments(BaseSchema):
         if granularity is None:
             self.granularity = SteppingGranularity()
         else:
-            self.granularity = SteppingGranularity(**granularity) if granularity.__class__ !=  SteppingGranularity else granularity
+            self.granularity = SteppingGranularity(**kwargs) if granularity.__class__ !=  SteppingGranularity else granularity
         self.kwargs = kwargs
 
 
@@ -6279,7 +6279,7 @@ class StepBackArguments(BaseSchema):
         if granularity is None:
             self.granularity = SteppingGranularity()
         else:
-            self.granularity = SteppingGranularity(**granularity) if granularity.__class__ !=  SteppingGranularity else granularity
+            self.granularity = SteppingGranularity(**kwargs) if granularity.__class__ !=  SteppingGranularity else granularity
         self.kwargs = kwargs
 
 

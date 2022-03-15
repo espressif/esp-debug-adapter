@@ -38,7 +38,7 @@ from pprint import pformat
 from . import debug_backend as dbg
 from . import log
 from .command_processor import CommandProcessor
-from .internal_classes import DaOpenOcdModes, DaDevModes, DaRunState, DaStates, DaArgs
+from .internal_classes import DaOpenOcdModes, DaDevModes, DaVariableReference, DaRunState, DaStates, DaArgs
 from .threads import ReaderThread, WriterThread
 from .tools import sys, PY2, ObjFromDict, WIN32, path_disassemble
 
@@ -89,6 +89,7 @@ class DebugAdapter:
         self.__read_from = None
         self.__write_to = None
         self.__source_bps = {}
+        self.__instr_bps = {}
         self.__threads_lock = threading.Lock()
         self.__threads = []  # type: List
         # === protected stuff
@@ -401,7 +402,10 @@ class DebugAdapter:
         self.select_frame(frame_id)
         s = []
         v_list = self._gdb.get_local_variables(no_values=True)
-        s.append({'name': 'Local', 'vals_list': v_list})
+        s.append({'name': 'Locals', 'vals_list': v_list, 'varRef': DaVariableReference.LOCALS, 'pHint': 'locals'})
+        reg_list = self.get_registers()
+        s.append({'name': 'Registers', 'vals_list': reg_list,
+                  'varRef': DaVariableReference.REGISTERS, 'pHint': 'registers'})
         return s
 
     def get_vars(self, frame_id=None):
@@ -422,6 +426,51 @@ class DebugAdapter:
         self.select_frame(frame_id, force=True)  # TODO try to remove changing of a frame
         v = self._gdb.get_local_variables(no_values=False)
         return v
+
+    def get_registers(self):
+        """
+        List of registers. Each register host a value in hex.
+
+        Parameters
+        ----------
+        fmt: string
+            Format to use for registers
+
+        Returns
+        -------
+            list
+                list of registers
+        """
+        r_names_list = self._gdb.get_reg_names()
+        r_values_list = self._gdb.get_reg_values('x')
+        reg_list = []
+
+        for reg_val in r_values_list:
+            reg_list.append({'name': r_names_list[int(reg_val['number'])],
+                             'value': reg_val['value'], 'ref': int(reg_val['number'])})
+        return reg_list
+
+    def inst_break_add(self, addr, condition=''):
+        """
+        Instruction Breakpoint setting
+
+        Parameters
+        ----------
+        addr : str
+        condition : str
+        """
+        bp_num = self._gdb.add_bp("*{}".format(addr), ignore_count=0, cond=condition)
+        if addr not in self.__instr_bps:
+            self.__instr_bps[addr] = {}
+        assert bp_num not in self.__instr_bps[addr]
+        self.__instr_bps[addr][bp_num] = (addr, condition)
+        return bp_num
+
+    def inst_break_removeall(self):
+        for addr in self.__instr_bps:
+            for bp_num in self.__instr_bps[addr]:
+                self._gdb.delete_bp(bp_num)
+            self.__instr_bps.pop(addr)
 
     def source_break_add(self, src, line, condition=''):
         """
@@ -449,7 +498,11 @@ class DebugAdapter:
 
     def _gdb2dap_reason(self, rsn):
         if rsn == dbg.TARGET_STOP_REASON_BP:
-            return 'breakpoint'
+            frame = self._gdb.get_current_frame()
+            if frame['addr'] in self.__instr_bps:
+                return 'instruction breakpoint'
+            else:
+                return 'breakpoint'
         elif rsn == dbg.TARGET_STOP_REASON_STEPPED:
             return 'stepped'
         elif rsn == dbg.TARGET_STOP_REASON_SIGINT:
@@ -777,3 +830,35 @@ class DebugAdapter:
         """
         self._gdb.exec_finish()
         return self._check_run_n_stop()
+
+    def get_disassemble_instructions(self, start_addr, end_addr):
+        """
+        Return disassembled instructions from a given address range
+
+        Parameters
+        ----------
+        start_addr ; int
+            initial address to read
+
+        end_addr : int
+            end address to read
+
+        Returns
+        -------
+        list
+            List of disassemble instructions
+        """
+        errs = 0
+        instructions = []
+        try:
+            val = self._gdb.disassemble(start_addr, end_addr)
+            for inst in val:
+                new_instruction = {
+                    "address": inst['address'],
+                    "instruction": inst['inst'],
+                    "symbol": inst['func-name'] + inst['offset']
+                }
+                instructions.append(new_instruction)
+        except TypeError:
+            errs += 1
+        return (instructions, errs)

@@ -75,6 +75,11 @@ class DaRunState(IntEnum):
     READY = 6
 
 
+class DaVariableReference(IntEnum):
+    LOCALS = 12
+    REGISTERS = 24
+
+
 class DaStates(object):
     general_state = DaRunState.STOPPED  # type: DaRunState
     ready = False  # TODO: replace to a lock
@@ -93,6 +98,7 @@ class DaArgs(object):
     """
     Contains mandatory set of Da arguments. Can be extended with **kwargs
     """
+
     def __init__(self,
                  app_flash_off=None,
                  board_type="",
