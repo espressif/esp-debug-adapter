@@ -402,10 +402,10 @@ class DebugAdapter:
         self.select_frame(frame_id)
         s = []
         v_list = self._gdb.get_local_variables(no_values=True)
-        s.append({'name': 'Locals', 'vals_list': v_list, 'varRef': DaVariableReference.LOCALS, 'pHint': 'locals'})
+        s.append({'name': 'Locals', 'vals_list': v_list, 'var_ref': DaVariableReference.LOCALS, 'p_hint': 'locals'})
         reg_list = self.get_registers()
         s.append({'name': 'Registers', 'vals_list': reg_list,
-                  'varRef': DaVariableReference.REGISTERS, 'pHint': 'registers'})
+                  'var_ref': DaVariableReference.REGISTERS, 'p_hint': 'registers'})
         return s
 
     def get_vars(self, frame_id=None):
@@ -855,8 +855,7 @@ class DebugAdapter:
             for inst in val:
                 new_instruction = {
                     "address": inst['address'],
-                    "instruction": inst['inst'],
-                    "symbol": inst['func-name'] + inst['offset']
+                    "instruction": inst['inst']
                 }
                 instructions.append(new_instruction)
         except TypeError:
