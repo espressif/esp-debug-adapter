@@ -507,7 +507,7 @@ class CommandProcessor(object):
         """
         self.evaluated = False
         variables_for_body = []  # type: list[schema.Variable]
-        if request.arguments.variableReference == DaVariableReference.LOCALS:
+        if request.arguments.variablesReference == DaVariableReference.LOCALS:
             vars = self.da.get_vars(frame_id=self.da.frame_id_selected)
             for v in vars:
                 # v_size = len(v['value'])
@@ -518,7 +518,7 @@ class CommandProcessor(object):
                 # variablesReference = len(v['value'])
                 v_dap_obj = schema.Variable(name=v['name'], value=v_val, variablesReference=0)
                 variables_for_body.append(v_dap_obj.to_dict())
-        elif request.arguments.variableReference == DaVariableReference.REGISTERS:
+        elif request.arguments.variablesReference == DaVariableReference.REGISTERS:
             registers = self.da.get_registers()
             for r in registers:
                 reg_dap_obj = schema.Variable(name=r['name'], value=r['value'], variablesReference=0)
@@ -719,7 +719,6 @@ class CommandProcessor(object):
         ----------
         request : schema.SetInstructionBreakpointsRequest
         """
-        self.da.inst_break_removeall()
         for ibp in request.arguments.breakpoints:
             self.da.inst_break_add(ibp.get('instructionReference'), '')
         kwargs = {'body': schema.SetInstructionBreakpointsResponseBody(breakpoints=request.arguments.breakpoints)}
