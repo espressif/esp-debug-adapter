@@ -553,6 +553,25 @@ class Gdb(object):
     def disconnect(self):
         self.target_disconnect()
 
+    def disassemble(self, start_addr, end_addr):
+        """
+
+        Parameters
+        ----------
+        start_addr : str (hex)
+        end_address: str (hex)
+
+        Returns
+        -------
+        res_body['asm_insns']: list of disassembled instructions
+        """
+        res, res_body = self._mi_cmd_run('-data-disassemble -s %s -e %s -- 0' % (start_addr, end_addr), tmo=1)
+        if res == 'done' and 'asm_insns' in res_body:
+            return res_body['asm_insns']
+        elif res == "error" and 'msg' in res_body:
+            return res_body['msg']
+        raise DebuggerError('Failed to disassemble given addresses')
+
     def resume(self):
         self.exec_continue()
         self.wait_target_state(TARGET_STATE_RUNNING, 5)
