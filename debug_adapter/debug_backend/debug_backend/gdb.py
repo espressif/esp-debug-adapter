@@ -553,7 +553,7 @@ class Gdb(object):
     def disconnect(self):
         self.target_disconnect()
 
-    def disassemble(self, start_addr, end_addr):
+    def disassemble(self, start_addr, end_addr, mode=1):
         """
 
         Parameters
@@ -565,7 +565,7 @@ class Gdb(object):
         -------
         res_body['asm_insns']: list of disassembled instructions
         """
-        res, res_body = self._mi_cmd_run('-data-disassemble -s %s -e %s -- 0' % (start_addr, end_addr), tmo=1)
+        res, res_body = self._mi_cmd_run('-data-disassemble -s %s -e %s -- %s' % (start_addr, end_addr, mode), tmo=1)
         if res == 'done' and 'asm_insns' in res_body:
             return res_body['asm_insns']
         elif res == "error" and 'msg' in res_body:
