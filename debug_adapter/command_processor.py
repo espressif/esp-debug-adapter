@@ -703,7 +703,7 @@ class CommandProcessor(object):
         request : schema.DisassembleRequest
         """
         end_addr = int(request.arguments.memoryReference, 16) + \
-            (request.arguments.instructionCount + request.arguments.instructionOffset)
+            request.arguments.instructionCount + request.arguments.instructionOffset
 
         data, errors = self.da.get_disassemble_instructions(request.arguments.memoryReference, hex(end_addr))
         kwargs = {'body': schema.DisassembleResponseBody(instructions=data)}

@@ -853,11 +853,20 @@ class DebugAdapter:
         try:
             val = self._gdb.disassemble(start_addr, end_addr)
             for inst in val:
-                new_instruction = {
-                    "address": inst['address'],
-                    "instruction": inst['inst']
+                line = inst['line'] if 'line' in inst else None
+                source = {
+                    'name': inst['file'] if 'file' in inst else None,
+                    'path': inst['fullname'] if 'fullname' in inst else None
                 }
-                instructions.append(new_instruction)
+                for asm_line in inst['line_asm_insn']:
+                    new_instruction = {
+                        "address": asm_line['address'],
+                        "instruction": asm_line['inst'],
+                        "instructionBytes": asm_line['opcodes'] if 'opcodes' in asm_line else None,
+                        "line": line,
+                        "location": source
+                    }
+                    instructions.append(new_instruction)
         except TypeError:
             errs += 1
         return (instructions, errs)
