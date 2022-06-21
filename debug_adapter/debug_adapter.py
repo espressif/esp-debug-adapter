@@ -850,8 +850,9 @@ class DebugAdapter:
         """
         errs = 0
         instructions = []
+        mode = 5  # Disassemble mode 5 to include C code
         try:
-            val = self._gdb.disassemble(start_addr, end_addr)
+            val = self._gdb.disassemble(start_addr, end_addr, mode)
             for inst in val:
                 line = inst['line'] if 'line' in inst else None
                 source = {
