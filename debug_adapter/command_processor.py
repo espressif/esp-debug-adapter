@@ -82,6 +82,7 @@ class CommandProcessor(object):
             # Supported features
             response.body.supportsConfigurationDoneRequest = True
             response.body.supportsConditionalBreakpoints = True
+            response.body.supportsDataBreakpoints = True
             response.body.supportsHitConditionalBreakpoints = True
             response.body.supportsSetVariable = True
             response.body.supportsRestartRequest = True
@@ -111,7 +112,6 @@ class CommandProcessor(object):
             response.body.supportsTerminateThreadsRequest = False
             response.body.supportsSetExpression = False
             response.body.supportsTerminateRequest = False
-            response.body.supportsDataBreakpoints = False
             response.body.supportsReadMemoryRequest = False
             response.body.supportsCancelRequest = False
             response.body.supportsBreakpointLocationsRequest = False
@@ -488,15 +488,43 @@ class CommandProcessor(object):
         response = base_schema.build_response(request, kwargs)
         self.write_message(response)
 
+    def on_dataBreakpointInfo_request(self, request):
+        """
+        Parameters
+        ----------
+        request:schema.DataBreakpointInfoRequest
+        """
+        varRef = request.arguments.variablesReference
+        name = request.arguments.name
+        access_type = ['read', 'write', 'readWrite']
+        kwargs = {'body': schema.DataBreakpointInfoResponseBody(
+            dataId=varRef, description=name, accessTypes=access_type, canPersist=True)}
+        response = base_schema.build_response(request, kwargs)
+        self.write_message(response)
+
     def on_setDataBreakpoints_request(self, request):
         """
         Parameters
         ----------
-        request:schema.SetBreakpointsRequest
-            TODO check!!!
+        request:schema.SetDataBreakpointsRequest
         """
-        kwargs = {}
+        data_bps = request.arguments.breakpoints  # type: list[dict]
+        self.da.data_break_removeall()
+
+        success = True
+        for bp in data_bps:
+            access_type = bp['accessType']
+            expr = bp['description']
+            try:
+                self.da.data_break_add(expr, access_type)
+            except Exception:
+                success = False
+                break
+
+        kwargs = {'body': schema.SetDataBreakpointsResponseBody(data_bps)}
+        success = True
         response = base_schema.build_response(request, kwargs)
+        response.success = success
         self.write_message(response)
 
     def on_variables_request(self, request):

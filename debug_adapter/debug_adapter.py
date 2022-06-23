@@ -88,6 +88,7 @@ class DebugAdapter:
         self._cmd_exec = CommandProcessor(self, self.__write_queue, self.args)
         self.__read_from = None
         self.__write_to = None
+        self.__data_bps = {}
         self.__source_bps = {}
         self.__instr_bps = {}
         self.__threads_lock = threading.Lock()
@@ -496,6 +497,30 @@ class DebugAdapter:
             self._gdb.delete_bp(bp_num)
         self.__source_bps.pop(source_path)
 
+    def data_break_add(self, expr, accessType='write'):
+        """
+        Data breakpoint setting
+
+        Parameters
+        ----------
+        exp : str
+        tp : str
+        """
+        tp = 'w'
+        if accessType == 'read':
+            tp = 'r'
+        elif accessType == 'readWrite':
+            tp = 'rw'
+        bp_num = self._gdb.add_wp(expr, tp)
+        assert bp_num not in self.__data_bps
+        self.__data_bps[bp_num] = expr
+        return bp_num
+
+    def data_break_removeall(self):
+        for bp_num in self.__data_bps.keys():
+            self._gdb.delete_bp(bp_num)
+        self.__data_bps.clear()
+
     def _gdb2dap_reason(self, rsn):
         if rsn == dbg.TARGET_STOP_REASON_BP:
             frame = self._gdb.get_current_frame()
@@ -507,6 +532,8 @@ class DebugAdapter:
             return 'stepped'
         elif rsn == dbg.TARGET_STOP_REASON_SIGINT:
             return 'pause'
+        elif rsn == dbg.TARGET_STOP_REASON_SIGTRAP:
+            return 'data breakpoint'
         elif rsn == dbg.TARGET_STOP_REASON_FN_FINISHED:
             return 'entry'
         else:
