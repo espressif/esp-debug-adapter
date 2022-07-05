@@ -29,3 +29,9 @@ class DebuggerError(RuntimeError):
 
 class DebuggerTargetStateTimeoutError(DebuggerError):
     pass
+
+
+class NoGdbProcessError(ValueError):
+    """Raise when trying to interact with gdb subprocess in pygdbmi, but it does not exist.
+    It may have been killed and removed, or failed to initialize for some reason."""
+    pass
