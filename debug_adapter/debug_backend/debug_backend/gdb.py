@@ -1,5 +1,6 @@
 from . import log
 from .defs import *
+from .utils import verify_valid_gdb_subprocess
 import os
 import time
 import re
@@ -47,7 +48,6 @@ class Gdb(object):
         self._remote_target = remote_target
         self._extended_remote_mode = extended_remote_mode
         self._logger = log.logger_init("Gdb", log_level, log_stream_handler, log_file_handler)
-        self._gdbmi = GdbController(gdb_path=gdb_path)
         self._gdbmi_lock = threading.Lock()
         self._resp_cache = []
         self._target_state = TARGET_STATE_UNKNOWN
@@ -55,6 +55,11 @@ class Gdb(object):
         self.stream_handlers = {'console': [], 'target': [], 'log': []}
         self._curr_frame = None
         self._curr_wp_val = None
+        try:
+            self._gdbmi = GdbController(command=[gdb_path])
+        except TypeError:
+            # fallback for pygdbmi<0.10.0.0.
+            self._gdbmi = GdbController(gdb_path=gdb_path)
         # gdb config
         try:
             self.prog_startup_cmdfile = None
@@ -185,7 +190,7 @@ class Gdb(object):
                     response += r
                     done = _mi_cmd_isdone(response, response_on_success)
             except Exception as e:
-                self._gdbmi.verify_valid_gdb_subprocess()
+                verify_valid_gdb_subprocess(self._gdbmi.gdb_process)
         else:
             self._gdbmi_lock.acquire()
             while len(response) == 0:

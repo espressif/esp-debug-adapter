@@ -160,11 +160,11 @@
         },
         "pygdbmi": {
             "hashes": [
-                "sha256:52a95fc53bf52f570c74d77dccc3202c9bb9c89e6cb14f6bffde8528835d4a4b",
-                "sha256:91e6a84b52994a64945aec98ea50189ff4f4cc1082947cc4850eb419044021c3"
+                "sha256:81dfc9e7ffd49f5006685a243905cee72216303e5ea42f6588793dfb8c8407ab",
+                "sha256:f3c2b5b691ddf8cabc804f1a7e5c23979634a755f2c363b9449f9808ad43072f"
             ],
             "index": "pypi",
-            "version": "==0.9.0.2"
+            "version": "==0.10.0.2"
         },
         "pylint": {
             "hashes": [
