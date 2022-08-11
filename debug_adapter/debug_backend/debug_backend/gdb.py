@@ -444,6 +444,28 @@ class Gdb(object):
             raise DebuggerError('Failed to get backtrace! (%s / %s)' % (res, res_body))
         return res_body['stack']
 
+    def read_memory_bytes(self, addr, count, off=0):
+        """
+        Returns list of all accessible memory regions in the specified range
+
+        Parameters
+        ----------
+        addr : hex
+            address to read
+
+        count : int
+            The number of addressable memory units to read
+
+        Returns
+        -------
+        memory
+            list of memory block tuples (begin, content, end, offset)
+        """
+        res, res_body = self._mi_cmd_run('-data-read-memory-bytes -o %d %s %s' % (off, addr, count))
+        if res != 'done' or not res_body or 'memory' not in res_body:
+            raise DebuggerError('Failed to get value at given memory address %s and count %s' % (addr, count))
+        return res_body['memory']
+
     def select_frame(self, frame):
         # -stack-select-frame framenum
         res, _ = self._mi_cmd_run('-stack-select-frame %d' % frame)

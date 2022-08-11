@@ -90,6 +90,7 @@ class CommandProcessor(object):
             response.body.supportsStepInTargetsRequest = True
             response.body.supportsDisassembleRequest = True
             response.body.supportsInstructionBreakpoints = True
+            response.body.supportsReadMemoryRequest = True
             response.body.supportsSteppingGranularity = True
             # Not supported features
             response.body.supportsFunctionBreakpoints = False
@@ -112,7 +113,6 @@ class CommandProcessor(object):
             response.body.supportsTerminateThreadsRequest = False
             response.body.supportsSetExpression = False
             response.body.supportsTerminateRequest = False
-            response.body.supportsReadMemoryRequest = False
             response.body.supportsCancelRequest = False
             response.body.supportsBreakpointLocationsRequest = False
             response.body.supportsClipboardContext = False
@@ -436,6 +436,25 @@ class CommandProcessor(object):
             response = base_schema.build_response(request, kwargs={'body': {
                 'value': value
             }})  # type: schema.SetVariableResponse
+            self.write_message(response)
+
+    def on_readMemory_request(self, request):
+        """
+        Parameters
+        ----------
+        request: schema.ReadMemoryRequest
+        """
+        if self.da.args.postmortem:
+            response = base_schema.build_response(request)
+            response.success = False
+            self.write_message(response)
+            self.generate_OutputEvent("Not implemented")
+        else:
+            addr = int(request.arguments.memoryReference, 0) + int(request.arguments.offset)
+            data = self.da._gdb.read_memory_bytes(hex(addr), request.arguments.count)
+            response = base_schema.build_response(request, kwargs={'body': {'address': hex(
+                addr), 'data': data}})  # type: schema.ReadMemoryResponse
+            response.success = True
             self.write_message(response)
 
     def on_evaluate_request(self, request):
