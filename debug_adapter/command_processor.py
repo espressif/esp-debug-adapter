@@ -450,10 +450,10 @@ class CommandProcessor(object):
             self.write_message(response)
             self.generate_OutputEvent("Not implemented")
         else:
-            addr = int(request.arguments.memoryReference, 0) + int(request.arguments.offset)
-            data = self.da._gdb.read_memory_bytes(hex(addr), request.arguments.count)
-            response = base_schema.build_response(request, kwargs={'body': {'address': hex(
-                addr), 'data': data}})  # type: schema.ReadMemoryResponse
+            # TO DO GET COUNT of variable or DEFINE amount of bytes to read from memory
+            memory_bytes = self.da.read_memory(request.arguments.memoryReference, 4000, request.arguments.offset)
+            kwargs = {'body': schema.ReadMemoryResponseBody(request.arguments.memoryReference, data=memory_bytes)}
+            response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ReadMemoryResponse
             response.success = True
             self.write_message(response)
 
@@ -557,13 +557,10 @@ class CommandProcessor(object):
         if request.arguments.variablesReference == DaVariableReference.LOCALS:
             vars = self.da.get_vars(frame_id=self.da.frame_id_selected)
             for v in vars:
-                # v_size = len(v['value'])
                 v_val = v['value']
-                # v_val_fu = str(v_val)
-                # else: # TODO think about variablesReference sizes
-                # if v_size > 1:
-                # variablesReference = len(v['value'])
-                v_dap_obj = schema.Variable(name=v['name'], value=v_val, variablesReference=0)
+                v_mem_ref = self.da.evaluate('&' + v['name'])
+                v_dap_obj = schema.Variable(name=v['name'], value=v_val,
+                                            variablesReference=0, memoryReference=v_mem_ref)
                 variables_for_body.append(v_dap_obj.to_dict())
         elif request.arguments.variablesReference == DaVariableReference.REGISTERS:
             registers = self.da.get_registers()

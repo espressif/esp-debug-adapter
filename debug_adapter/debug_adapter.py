@@ -22,12 +22,13 @@
 #
 # SPDX-License-Identifier: MIT
 
+import copy
 import os
 import os.path
 import socket
 import tempfile
 import threading
-import copy
+from base64 import b64encode
 from datetime import datetime
 
 # noinspection PyCompatibility
@@ -762,6 +763,31 @@ class DebugAdapter:
         """
         r = self._gdb.data_eval_expr(expr)
         return r
+
+    def read_memory(self, addr, count, offset):
+        """
+        Parameters
+        ----------
+        addr: str
+            address to read in memory
+        count: int
+            number of bytes to read
+        offset: int
+            offset from addr to read
+        """
+        memory_result = self._gdb.read_memory_bytes(addr, count, offset)
+        mem_data = memory_result[0]['contents']
+        num_bytes = len(memory_result[0]['contents']) // 2
+        int_arr = [None] * num_bytes
+        dx = 0
+        char_int_dict = dict(zip([format(i, 'x').zfill(2) for i in range(256)], range(256)))
+        for ix in range(num_bytes):
+            tmp = mem_data[dx] + mem_data[dx + 1]
+            dx = dx + 2
+            int_arr[ix] = char_int_dict[tmp]
+        bytes_from_arr = bytes(int_arr)
+        encoded_base64_str = b64encode(bytes_from_arr).decode()
+        return encoded_base64_str
 
     def gdb_execute(self, cmd):
         """
