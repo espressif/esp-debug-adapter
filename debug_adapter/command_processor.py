@@ -11,7 +11,7 @@ import json
 from queue import Queue
 from . import schema, base_schema, log
 from .tools import get_good_path, Measurement
-from .internal_classes import DaDevModes, DaRunState, DaVariableReference
+from .internal_classes import DaDevModes, DaRunState
 
 
 POST_MORTEM_MODE_NOTIFICATION = "---\n" \
@@ -554,19 +554,13 @@ class CommandProcessor(object):
         """
         self.evaluated = False
         variables_for_body = []  # type: list[schema.Variable]
-        if request.arguments.variablesReference == DaVariableReference.LOCALS:
-            vars = self.da.get_vars(frame_id=self.da.frame_id_selected)
-            for v in vars:
-                v_val = v['value']
-                v_mem_ref = self.da.evaluate('&' + v['name'])
-                v_dap_obj = schema.Variable(name=v['name'], value=v_val,
-                                            variablesReference=0, memoryReference=v_mem_ref)
-                variables_for_body.append(v_dap_obj.to_dict())
-        elif request.arguments.variablesReference == DaVariableReference.REGISTERS:
-            registers = self.da.get_registers()
-            for r in registers:
-                reg_dap_obj = schema.Variable(name=r['name'], value=r['value'], variablesReference=0)
-                variables_for_body.append(reg_dap_obj.to_dict())
+        da_vars = self.da.get_vars(request.arguments.variablesReference)
+        for v in da_vars:
+            v_dap_obj = schema.Variable(name=v['name'],
+                                        value=v['value'],
+                                        variablesReference=v['ref'],
+                                        memoryReference=v['mem_addr'])
+            variables_for_body.append(v_dap_obj.to_dict())
         kwargs = {'body': schema.VariablesResponseBody(variables=variables_for_body)}
         response = base_schema.build_response(request, kwargs)
         self.write_message(response)

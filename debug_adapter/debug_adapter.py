@@ -25,6 +25,7 @@
 import copy
 import os
 import os.path
+from re import match
 import socket
 import tempfile
 import threading
@@ -39,7 +40,15 @@ from pprint import pformat
 from . import debug_backend as dbg
 from . import log
 from .command_processor import CommandProcessor
-from .internal_classes import DaOpenOcdModes, DaDevModes, DaVariableReference, DaRunState, DaStates, DaArgs
+from .internal_classes import (
+    DaOpenOcdModes,
+    DaDevModes,
+    DaVariableReference,
+    DaRunState,
+    DaStates,
+    DaArgs,
+    VariableParser
+)
 from .threads import ReaderThread, WriterThread
 from .tools import sys, PY2, ObjFromDict, WIN32, path_disassemble
 
@@ -94,6 +103,7 @@ class DebugAdapter:
         self.__instr_bps = {}
         self.__threads_lock = threading.Lock()
         self.__threads = []  # type: List
+        self.__variables = {}
         # === protected stuff
         self._gdb = gdb_inst  # type: dbg.GdbEspXtensa or dbg.Gdb
         self._oocd = oocd_inst  # type: dbg.Oocd
@@ -410,7 +420,7 @@ class DebugAdapter:
                   'var_ref': DaVariableReference.REGISTERS, 'p_hint': 'registers'})
         return s
 
-    def get_vars(self, frame_id=None):
+    def get_vars(self, var_ref=0):
         """
         List of variables. Each variable is an object in terms of GDB (read the manual)
 
@@ -425,9 +435,29 @@ class DebugAdapter:
                 list of local variables
 
         """
-        self.select_frame(frame_id, force=True)  # TODO try to remove changing of a frame
-        v = self._gdb.get_local_variables(no_values=False)
-        return v
+        self.select_frame(self.frame_id_selected, force=True)  # TODO try to remove changing of a frame
+        if var_ref == DaVariableReference.LOCALS:
+            self.__variables = {}
+            local_vars = self._gdb.get_local_variables(no_values=False)
+            cur_var_ref = var_ref
+            parsed_local_vars = []
+            for local_v in local_vars:
+                parsed_local_var = VariableParser(local_v['value'], cur_var_ref)
+                parsed_local_result = parsed_local_var.parse_variable_value()
+                var_result = parsed_local_var.create_value(local_v['name'], parsed_local_result)
+                self.__variables.update(parsed_local_var.get_variables())
+                cur_var_ref = parsed_local_var.handler.get_handler()
+                v_mem_ref = self.read_address(local_v['name'])
+                parsed_local_vars.append(
+                    {'name': var_result['name'],
+                     'value': var_result['value'],
+                     'ref': var_result['ref'],
+                     'mem_addr': v_mem_ref})
+            return parsed_local_vars
+        elif var_ref == DaVariableReference.REGISTERS:
+            return self.get_registers()
+        else:
+            return self.__variables[var_ref] if self.__variables[var_ref] else []
 
     def get_registers(self):
         """
@@ -448,8 +478,9 @@ class DebugAdapter:
         reg_list = []
 
         for reg_val in r_values_list:
+            # int(reg_val['number']
             reg_list.append({'name': r_names_list[int(reg_val['number'])],
-                             'value': reg_val['value'], 'ref': int(reg_val['number'])})
+                             'value': reg_val['value'], 'ref': 0, 'mem_addr': None})
         return reg_list
 
     def inst_break_add(self, addr, condition=''):
@@ -763,6 +794,26 @@ class DebugAdapter:
         """
         r = self._gdb.data_eval_expr(expr)
         return r
+
+    def read_address(self, var_name: str):
+        """
+        Return the hex address of a given variable name
+
+        Parameters
+        ----------
+        var_name: str
+
+        Returns
+        -------
+        hex_addr: str
+        """
+        hex_regex = r'^0x[0-9a-fA-F]+'
+        eval_result = self._gdb.data_eval_expr('&' + var_name)
+        regex_match = match(hex_regex, eval_result)
+        print('hola juan')
+        if regex_match:
+            print(regex_match[0])
+        return regex_match[0] if regex_match else None
 
     def read_memory(self, addr, count, offset):
         """
