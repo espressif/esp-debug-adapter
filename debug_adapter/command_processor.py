@@ -357,34 +357,41 @@ class CommandProcessor(object):
         ----------
         request: schema.StackTraceRequest
         """
-        # reading:
-        thread_id = request.arguments.threadId
-        stack = self.da.get_backtrace(thread_id)
-        # composing
-        stack_frames_list = []  # type: list[schema.StackFrame]
-        for frame in stack:
-            src = schema.Source(path=get_good_path(frame.get('fullname')))
-            try:
-                line = int(frame.get('line'))
-            except TypeError:
-                line = None
-            if not str(frame.get('func')).strip('?'):
-                name = frame.get('addr')
-            else:
-                name = frame.get('func')
-            sf = schema.StackFrame(
-                id=self.da.frame_id_generate(thread_id, frame['level']),
-                name=name,
-                line=line,
-                column=0,
-                source=src,
-                instructionPointerReference=frame.get('addr')
-            )
-            stack_frames_list.append(sf.to_dict())  # to_dict because of a json encoding error
-        kwargs = {
-            'body': schema.StackTraceResponseBody(stackFrames=stack_frames_list, totalFrames=len(stack_frames_list))
-        }
+        success = True
+        try:
+            # reading:
+            thread_id = request.arguments.threadId
+            stack = self.da.get_backtrace(thread_id)
+            # composing
+            stack_frames_list = []  # type: list[schema.StackFrame]
+            for frame in stack:
+                src = schema.Source(path=get_good_path(frame.get('fullname')))
+                try:
+                    line = int(frame.get('line'))
+                except TypeError:
+                    line = None
+                if not str(frame.get('func')).strip('?'):
+                    name = frame.get('addr')
+                else:
+                    name = frame.get('func')
+                sf = schema.StackFrame(
+                    id=self.da.frame_id_generate(thread_id, frame['level']),
+                    name=name,
+                    line=line,
+                    column=0,
+                    source=src,
+                    instructionPointerReference=frame.get('addr')
+                )
+                stack_frames_list.append(sf.to_dict())  # to_dict because of a json encoding error
+            kwargs = {
+                'body': schema.StackTraceResponseBody(stackFrames=stack_frames_list, totalFrames=len(stack_frames_list))
+            }
+        except Exception as e:
+            success = False  # type: bool
+            log.debug_exception(e)
+            kwargs = {'body': schema.ErrorResponseBody(e)}
         response = base_schema.build_response(request, kwargs)
+        response.success = success
         self.write_message(response)
 
     def on_scopes_request(self, request):
@@ -394,28 +401,39 @@ class CommandProcessor(object):
         request:schema.ScopesRequest
         """
         frame_id = request.arguments.frameId
-        self.da.select_frame(frame_id)
-        scopes_for_body = []  # type: list[schema.Scope]
-        scopes = self.da.get_scopes()
-        for scope in scopes:
-            scope_dap_obj = schema.Scope(name=scope['name'],
-                                         variablesReference=int(scope['var_ref']),
-                                         expensive=False,
-                                         presentationHint=scope['p_hint'])
-            scopes_for_body.append(scope_dap_obj.to_dict())
-        # building a response:
-        kwargs = {'body': schema.ScopesResponseBody(scopes=scopes_for_body)}
+        success = True
+        try:
+            self.da.select_frame(frame_id)
+            scopes_for_body = []  # type: list[schema.Scope]
+            scopes = self.da.get_scopes()
+            for scope in scopes:
+                scope_dap_obj = schema.Scope(name=scope['name'],
+                                             variablesReference=int(scope['var_ref']),
+                                             expensive=False,
+                                             presentationHint=scope['p_hint'])
+                scopes_for_body.append(scope_dap_obj.to_dict())
+            # building a response:
+            kwargs = {'body': schema.ScopesResponseBody(scopes=scopes_for_body)}
+        except Exception as e:
+            success = False
+            log.debug_exception(e)
+            kwargs = {'body': schema.ErrorResponseBody(e)}
         response = base_schema.build_response(request, kwargs)
+        response.success = success
         self.write_message(response)
 
     def on_source_request(self, request):
         src_file_path = get_good_path(request.arguments.source.path)
+        success = True
         try:
             with open(src_file_path) as file:
                 src = file.read()
-        except Exception:
+        except Exception as e:
             src = "[UNKNOWN SOURCE FILE]\n---------------------"
+            log.debug_exception(e)
+            success = False
         response = base_schema.build_response(request, kwargs={'body': {'content': src}})  # type: schema.Source
+        response.success = success
         self.write_message(response)
 
     def on_setVariable_request(self, request):
@@ -451,10 +469,16 @@ class CommandProcessor(object):
             self.generate_OutputEvent("Not implemented")
         else:
             # TO DO GET COUNT of variable or DEFINE amount of bytes to read from memory
-            memory_bytes = self.da.read_memory(request.arguments.memoryReference, 4000, request.arguments.offset)
-            kwargs = {'body': schema.ReadMemoryResponseBody(request.arguments.memoryReference, data=memory_bytes)}
-            response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ReadMemoryResponse
-            response.success = True
+            try:
+                memory_bytes = self.da.read_memory(request.arguments.memoryReference, 4000, request.arguments.offset)
+                kwargs = {'body': schema.ReadMemoryResponseBody(request.arguments.memoryReference, data=memory_bytes)}
+                response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ReadMemoryResponse
+                response.success = True
+            except Exception as e:
+                log.debug_exception(e)
+                kwargs = {'body': schema.ErrorResponseBody(e)}
+                response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
+                response.success = False
             self.write_message(response)
 
     def on_evaluate_request(self, request):
@@ -536,12 +560,13 @@ class CommandProcessor(object):
             expr = bp['description']
             try:
                 self.da.data_break_add(expr, access_type)
-            except Exception:
-                success = False
+            except Exception as e:
+                bp.update({'verified': 'false'})
+                bp.update({{'message': e}})
+                log.debug_exception(e)
                 break
 
         kwargs = {'body': schema.SetDataBreakpointsResponseBody(data_bps)}
-        success = True
         response = base_schema.build_response(request, kwargs)
         response.success = success
         self.write_message(response)
@@ -554,16 +579,23 @@ class CommandProcessor(object):
         """
         self.evaluated = False
         variables_for_body = []  # type: list[schema.Variable]
-        da_vars = self.da.get_vars(request.arguments.variablesReference)
-        for v in da_vars:
-            v_dap_obj = schema.Variable(name=v['name'],
-                                        value=v['value'],
-                                        variablesReference=v['ref'],
-                                        memoryReference=v['mem_addr'])
-            variables_for_body.append(v_dap_obj.to_dict())
-        kwargs = {'body': schema.VariablesResponseBody(variables=variables_for_body)}
-        response = base_schema.build_response(request, kwargs)
-        self.write_message(response)
+        try:
+            da_vars = self.da.get_vars(request.arguments.variablesReference)
+            for v in da_vars:
+                v_dap_obj = schema.Variable(name=v['name'],
+                                            value=v['value'],
+                                            variablesReference=v['ref'],
+                                            memoryReference=v['mem_addr'])
+                variables_for_body.append(v_dap_obj.to_dict())
+            kwargs = {'body': schema.VariablesResponseBody(variables=variables_for_body)}
+            response = base_schema.build_response(request, kwargs)
+            self.write_message(response)
+        except Exception as e:
+            log.debug_exception(e)
+            kwargs = {'body': schema.ErrorResponseBody(e)}
+            response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
+            response.success = False
+            self.write_message(response)
 
     def on_disconnect_request(self, request):
         """
@@ -571,16 +603,23 @@ class CommandProcessor(object):
         ----------
         request:schema.DisconnectRequest
         """
-        # reading
-        r_args = request.arguments.to_dict()
-        restart = r_args.get('restart')
-        # doing
-        disconnect_response = base_schema.build_response(request)
-        self.generate_OutputEvent("Debug Adapter stopped\n")
-        self.da.adapter_stop()
-        self.write_message(disconnect_response)
-        if restart:
-            self.da.adapter_restart()
+        try:
+            # reading
+            r_args = request.arguments.to_dict()
+            restart = r_args.get('restart')
+            # doing
+            disconnect_response = base_schema.build_response(request)
+            self.generate_OutputEvent("Debug Adapter stopped\n")
+            self.da.adapter_stop()
+            self.write_message(disconnect_response)
+            if restart:
+                self.da.adapter_restart()
+        except Exception as e:
+            log.debug_exception(e)
+            kwargs = {'body': schema.ErrorResponseBody(e)}
+            response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
+            response.success = False
+            self.write_message(response)
 
     def on_pause_request(self, request):
         """
@@ -594,10 +633,17 @@ class CommandProcessor(object):
             self.write_message(response)
             self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
         else:
-            thread_id = request.arguments.threadId
-            self.da.pause()
-            self.write_message(response)
-            self.generate_StoppedEvent(reason='pause', thread_id=int(thread_id), all_threads_stopped=True)
+            try:
+                thread_id = request.arguments.threadId
+                self.da.pause()
+                self.write_message(response)
+                self.generate_StoppedEvent(reason='pause', thread_id=int(thread_id), all_threads_stopped=True)
+            except Exception as e:
+                log.debug_exception(e)
+                kwargs = {'body': schema.ErrorResponseBody(e)}
+                response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
+                response.success = False
+                self.write_message(response)
 
     def generate_BreakpointEvent(self, reason, bp):
         """
@@ -651,6 +697,8 @@ class CommandProcessor(object):
                         success = True
                         break
                     except Exception as e:
+                        bp.update({'verified': 'false'})
+                        bp.update({{'message': e}})
                         log.debug_exception(e)
 
             response = base_schema.build_response(request, kwargs)
@@ -661,7 +709,7 @@ class CommandProcessor(object):
         """
         Parameters
         ----------
-        request:schema.SetExpressionRequest
+        request:schema.SetExceptionBreakpointsRequest
         """
         response = base_schema.build_response(request)
         if self.da.args.postmortem:
@@ -687,12 +735,19 @@ class CommandProcessor(object):
             self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
 
         else:
-            result = self.da.step()
-            response.success = result
-            self.write_message(response)
-            if result:
-                self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
-            m.stop_n_check(0.5, "The step operation took too long")
+            try:
+                result = self.da.step()
+                response.success = result
+                self.write_message(response)
+                if result:
+                    self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
+                m.stop_n_check(0.5, "The step operation took too long")
+            except Exception as e:
+                log.debug_exception(e)
+                kwargs = {'body': schema.ErrorResponseBody(e)}
+                response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
+                response.success = False
+                self.write_message(response)
 
     def on_stepIn_request(self, request):
         """
@@ -707,12 +762,19 @@ class CommandProcessor(object):
             self.write_message(response)
             self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
         else:
-            thread_id = request.arguments.threadId
-            result = self.da.step_in()
-            response.success = result
-            self.write_message(response)
-            if result:
-                self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
+            try:
+                thread_id = request.arguments.threadId
+                result = self.da.step_in()
+                response.success = result
+                self.write_message(response)
+                if result:
+                    self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
+            except Exception as e:
+                log.debug_exception(e)
+                kwargs = {'body': schema.ErrorResponseBody(e)}
+                response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
+                response.success = False
+                self.write_message(response)
 
     def on_stepOut_request(self, request):
         """
@@ -727,12 +789,19 @@ class CommandProcessor(object):
             self.write_message(response)
             self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
         else:
-            thread_id = request.arguments.threadId
-            result = self.da.step_out()
-            response.success = result
-            self.write_message(response)
-            if result:
-                self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
+            try:
+                thread_id = request.arguments.threadId
+                result = self.da.step_out()
+                response.success = result
+                if result:
+                    self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
+                self.write_message(response)
+            except Exception as e:
+                log.debug_exception(e)
+                kwargs = {'body': schema.ErrorResponseBody(e)}
+                response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
+                response.success = False
+                self.write_message(response)
 
     def on_disassemble_request(self, request):
         """
@@ -742,14 +811,20 @@ class CommandProcessor(object):
         """
         end_addr = int(request.arguments.memoryReference, 16) + \
             request.arguments.instructionCount + request.arguments.instructionOffset
-
-        data, errors = self.da.get_disassemble_instructions(request.arguments.memoryReference, hex(end_addr))
-        kwargs = {'body': schema.DisassembleResponseBody(instructions=data)}
-        response = base_schema.build_response(request, kwargs)  # type: schema.DisassembleResponse
-        response.body.address = request.arguments.memoryReference
-        response.body.unreadableBytes = errors
-        response.success = True
-        self.write_message(response)
+        try:
+            data, errors = self.da.get_disassemble_instructions(request.arguments.memoryReference, hex(end_addr))
+            kwargs = {'body': schema.DisassembleResponseBody(instructions=data)}
+            response = base_schema.build_response(request, kwargs)  # type: schema.DisassembleResponse
+            response.body.address = request.arguments.memoryReference
+            response.body.unreadableBytes = errors
+            response.success = True
+            self.write_message(response)
+        except Exception as e:
+            log.debug_exception(e)
+            kwargs = {'body': schema.ErrorResponseBody(e)}
+            response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
+            response.success = False
+            self.write_message(response)
 
     def on_setInstructionBreakpoints_request(self, request):
         """
@@ -757,8 +832,14 @@ class CommandProcessor(object):
         ----------
         request : schema.SetInstructionBreakpointsRequest
         """
-        for ibp in request.arguments.breakpoints:
-            self.da.inst_break_add(ibp.get('instructionReference'), '')
+        ibps = request.arguments.breakpoints  # type: list[dict]
+        for ibp in ibps:
+            try:
+                self.da.inst_break_add(ibp.get('instructionReference'), '')
+            except Exception as e:
+                ibp.update({'verified': 'false'})
+                ibp.update({{'message': e}})
+                log.debug_exception(e)
         kwargs = {'body': schema.SetInstructionBreakpointsResponseBody(breakpoints=request.arguments.breakpoints)}
         response = base_schema.build_response(request, kwargs)
         response.success = True
