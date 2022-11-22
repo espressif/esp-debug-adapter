@@ -810,7 +810,6 @@ class DebugAdapter:
         hex_regex = r'^0x[0-9a-fA-F]+'
         eval_result = self._gdb.data_eval_expr('&' + var_name)
         regex_match = match(hex_regex, eval_result)
-        print('hola juan')
         if regex_match:
             print(regex_match[0])
         return regex_match[0] if regex_match else None
