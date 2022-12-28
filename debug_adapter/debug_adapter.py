@@ -104,6 +104,7 @@ class DebugAdapter:
         self.__threads_lock = threading.Lock()
         self.__threads = []  # type: List
         self.__variables = {}
+        self.__watchVariables = {}
         # === protected stuff
         self._gdb = gdb_inst  # type: dbg.GdbEspXtensa or dbg.Gdb
         self._oocd = oocd_inst  # type: dbg.Oocd
@@ -427,7 +428,7 @@ class DebugAdapter:
         Parameters
         ----------
         frame_id : int
-            Frame number tthat could be created or read with self.frame_id_* api
+            Frame number that could be created or read with self.frame_id_* api
 
         Returns
         -------
@@ -448,6 +449,8 @@ class DebugAdapter:
                 self.__variables.update(parsed_local_var.get_variables())
                 cur_var_ref = parsed_local_var.handler.get_handler()
                 v_mem_ref = self.read_address(local_v['name'])
+                if v_mem_ref is None and var_result['value'][:3] == "*0x":
+                    v_mem_ref = var_result['value'][1:]
                 parsed_local_vars.append(
                     {'name': var_result['name'],
                      'value': var_result['value'],
@@ -456,6 +459,8 @@ class DebugAdapter:
             return parsed_local_vars
         elif var_ref == DaVariableReference.REGISTERS:
             return self.get_registers()
+        elif var_ref > DaVariableReference.WATCH:
+            return self.__watchVariables[var_ref] if self.__watchVariables[var_ref] else []
         else:
             return self.__variables[var_ref] if self.__variables[var_ref] else []
 
@@ -794,6 +799,32 @@ class DebugAdapter:
         """
         r = self._gdb.data_eval_expr(expr)
         return r
+
+    def evaluateVariable(self, expr):
+        """
+        Parameters
+        ----------
+        expr: str
+
+        Return variables
+        ----------------
+        list
+            list of local variables
+        """
+        cur_var_ref = DaVariableReference.WATCH
+        result = self._gdb.data_eval_expr(expr)
+        parsed_local_var = VariableParser(result, cur_var_ref)
+        parsed_local_result = parsed_local_var.parse_variable_value()
+        var_result = parsed_local_var.create_value(expr, parsed_local_result)
+        self.__watchVariables.update(parsed_local_var.get_variables())
+        v_mem_ref = self.read_address(var_result['name'])
+        if v_mem_ref is None and var_result['value'][:3] == "*0x":
+            v_mem_ref = var_result['value'][1:]
+        parsedVariable = {'name': var_result['name'],
+                          'value': var_result['value'],
+                          'ref': var_result['ref'],
+                          'mem_addr': v_mem_ref}
+        return parsedVariable
 
     def read_address(self, var_name: str):
         """

@@ -79,6 +79,7 @@ class DaRunState(IntEnum):
 class DaVariableReference(IntEnum):
     LOCALS = 12
     REGISTERS = 24
+    WATCH = 36
 
 
 class DaStates(object):
