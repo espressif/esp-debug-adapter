@@ -511,6 +511,11 @@ class CommandProcessor(object):
                 }})
 
         # if the expression did't start with  `-exec` do the evaluate command
+        elif request.arguments.context == "watch":
+            result = self.da.evaluateVariable(expression)
+            kwargs = {'body': schema.EvaluateResponseBody(
+                str(result['value']), result['ref'], memoryReference=result['mem_addr'])}
+            evaluate_response = base_schema.build_response(request, kwargs)
         else:
             result = self.da.evaluate(expression)  # no symbol and other errors processing
             evaluate_response = base_schema.build_response(
