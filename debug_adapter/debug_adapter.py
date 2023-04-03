@@ -928,6 +928,7 @@ class DebugAdapter:
             else:
                 self._gdb.exec_run()
             if start:
+                self._gdb.halt()
                 rsn = self._gdb.wait_target_state(dbg.TARGET_STATE_STOPPED, 10)
                 self.on_target_stopped(rsn)
 
