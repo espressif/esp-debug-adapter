@@ -84,6 +84,7 @@ class CommandProcessor(object):
             response.body.supportsConditionalBreakpoints = True
             response.body.supportsDataBreakpoints = True
             response.body.supportsHitConditionalBreakpoints = True
+            response.body.supportsLogPoints = True
             response.body.supportsSetVariable = True
             response.body.supportsRestartRequest = True
             response.body.supportTerminateDebuggee = True
@@ -109,7 +110,6 @@ class CommandProcessor(object):
             response.body.supportsExceptionInfoRequest = False
             response.body.supportsDelayedStackTraceLoading = False
             response.body.supportsLoadedSourcesRequest = False
-            response.body.supportsLogPoints = False
             response.body.supportsTerminateThreadsRequest = False
             response.body.supportsSetExpression = False
             response.body.supportsTerminateRequest = False
@@ -683,7 +683,6 @@ class CommandProcessor(object):
             self.write_message(response)
             self.generate_OutputEvent(POST_MORTEM_MODE_NOTIFICATION)
         else:
-            # TODO add logpoints
             bps = request.arguments.breakpoints  # type: list[dict]
             source = request.arguments.source
             self.da.source_break_removeall(source.path)  # clear old ones
@@ -691,13 +690,18 @@ class CommandProcessor(object):
             for bp in bps:
                 src_line = bp.get('line')
                 condition = bp.get("condition", '')
+                log_message = bp.get('logMessage', '')
                 bp.update({'verified': 'true'})
                 bp.update({'source': source.to_dict()})
                 try_count = 5
                 while try_count:
                     try_count -= 1
                     try:
-                        try_set_once(get_good_path(source.path), src_line, condition)
+                        if log_message:
+                            self.da.source_logpoint_add(get_good_path(source.path), src_line, log_message, condition)
+                            self.generate_OutputEvent(log_message + "\n")
+                        else:
+                            try_set_once(get_good_path(source.path), src_line, condition)
                         kwargs = {'body': schema.SetBreakpointsResponseBody(bps)}
                         success = True
                         break

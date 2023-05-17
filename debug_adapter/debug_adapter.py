@@ -527,6 +527,25 @@ class DebugAdapter:
         self.__source_bps[src][bp_num] = (line, condition)
         return bp_num
 
+    def source_logpoint_add(self, src, line, log_message, condition=''):
+        """
+        Logpoint setting
+
+        Parameters
+        ----------
+        src : str
+        line : int
+        log_message: str
+        condition : str
+        """
+        logpoint_num = self._gdb.add_logpoint("{}:{}".format(
+            src, line), argument=log_message, ignore_count=0, cond=condition)
+        if src not in self.__source_bps:
+            self.__source_bps[src] = {}
+        assert logpoint_num not in self.__source_bps[src]
+        self.__source_bps[src][logpoint_num] = (line, condition)
+        return logpoint_num
+
     def source_break_removeall(self, source_path):
         if source_path not in self.__source_bps:
             return
