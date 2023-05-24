@@ -1,20 +1,14 @@
 [[source]]
-name = "pypi"
 url = "https://pypi.org/simple"
 verify_ssl = true
-
-[dev-packages]
+name = "pypi"
 
 [packages]
 click = "*"
-future = ">=0.17"
-psutil = "*"
-pygdbmi = "*"
-pylint = "*"
-requests = "*"
-typing = "*"
-xmlrunner = "*"
-"backports.functools-lru-cache" = "*"
+esp-debug-backend = "*"
+requests = ">=2.21.0"
+
+[dev-packages]
 
 [requires]
 python_version = ">3.7"

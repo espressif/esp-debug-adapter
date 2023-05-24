@@ -1,5 +1,5 @@
 ## Used to run the tests:
-debugpy
+debugpy==1.6.0
 pydevd
 pytest
 pytest-xdist
