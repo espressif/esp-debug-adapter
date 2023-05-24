@@ -23,6 +23,7 @@
 # SPDX-License-Identifier: MIT
 
 import copy
+import esp_debug_backend as dbg
 import os
 import os.path
 from re import match
@@ -37,7 +38,6 @@ from queue import Queue
 from typing import List, Any, IO, AnyStr
 from pprint import pformat
 
-from . import debug_backend as dbg
 from . import log
 from .command_processor import CommandProcessor
 from .internal_classes import (

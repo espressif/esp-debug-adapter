@@ -16,7 +16,7 @@ before_script:
 
 check_python_style:
   stage: checks
-  image: $CI_DOCKER_REGISTRY/esp32-ci-env
+  image: python:3.7-slim-buster
   artifacts:
     when: on_failure
     paths:
@@ -29,7 +29,7 @@ check_python_style:
 
 
 tests_unit:
-  image: $CI_DOCKER_REGISTRY/esp32-ci-env
+  image: $CI_DOCKER_REGISTRY/target-test-env-v5.2:1
   stage: tests
   tags:
     - gdb_amd64_test
@@ -48,6 +48,7 @@ tests_unit:
     - python3 -m pip install -r ./requirements.txt
     - python3 -m pip install -r ./tests/requirements.txt
     - python3 ./tests/target/build_all.py
+    # make 'xtensa-esp32-elf-gdb' accessible via PATH
+    - export PATH=$(dirname $(find /root -name xtensa-esp32-elf-gdb)):$PATH
     - cd $CI_PROJECT_DIR/tests
     - python3 -m pytest
-    # - python3 ./run_tests.py

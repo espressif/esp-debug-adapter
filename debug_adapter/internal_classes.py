@@ -29,7 +29,7 @@ from re import match
 # Some  other tools like flake8, language server of VSCode - Pylance  do not sopport it
 # and can consider imports unused. To bypass the warning message `noqa` comment is used.
 from typing import Tuple, Union  # noqa: F401
-from . import debug_backend as dbg
+import esp_debug_backend as dbg
 
 
 class Modes(object):
@@ -313,7 +313,7 @@ class VariableParser:
         char_str = self.value_str[0]
         remaining = self.value_str[1:]
         escaped = False
-        while(in_str):
+        while in_str:
             if escaped:
                 escaped = False
             elif remaining[0] == '\\':
