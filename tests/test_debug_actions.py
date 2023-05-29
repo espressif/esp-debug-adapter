@@ -66,12 +66,12 @@ def test_source_breakpoints(setup_teardown, hostapp_args):  # noqa: F811
         ts.send_request(REQUEST_INIT)
         ts.send_request(REQUEST_LAUNCH)
         set_breakpoints(ts, "test_app.c", [{"line": 11}])
-        set_breakpoints(ts, "test_app_src2.c", [{"line": 4}, {"line": 17}])
         # run to the first breakpoint
         continue_till_stopped(ts, stop_reason="breakpoint", thread_id=2, timeout=None)
         line, name = get_top_frame_info(ts, thread_id=2)
         assert name == "print_hamlet_thread"
         assert line == 11
+        set_breakpoints(ts, "test_app_src2.c", [{"line": 4}, {"line": 17}])
         # run to  the next breakpoint
         continue_till_stopped(ts, stop_reason="breakpoint", thread_id=2, timeout=None)
         line, name = get_top_frame_info(ts, thread_id=2)

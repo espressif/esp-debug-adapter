@@ -557,6 +557,7 @@ class CommandProcessor(object):
         request:schema.SetDataBreakpointsRequest
         """
         data_bps = request.arguments.breakpoints  # type: list[dict]
+        self.da.pause()
         self.da.data_break_removeall()
 
         success = True
@@ -570,7 +571,7 @@ class CommandProcessor(object):
                 bp.update({{'message': e}})
                 log.debug_exception(e)
                 break
-
+        # self.da.resume_exec()
         kwargs = {'body': schema.SetDataBreakpointsResponseBody(data_bps)}
         response = base_schema.build_response(request, kwargs)
         response.success = success
@@ -685,6 +686,7 @@ class CommandProcessor(object):
         else:
             bps = request.arguments.breakpoints  # type: list[dict]
             source = request.arguments.source
+            self.da.pause()
             self.da.source_break_removeall(source.path)  # clear old ones
 
             for bp in bps:
@@ -710,6 +712,7 @@ class CommandProcessor(object):
                         bp.update({{'message': e}})
                         log.debug_exception(e)
 
+            # self.da.resume_exec()
             response = base_schema.build_response(request, kwargs)
             response.success = success
             self.write_message(response)
@@ -842,6 +845,8 @@ class CommandProcessor(object):
         request : schema.SetInstructionBreakpointsRequest
         """
         ibps = request.arguments.breakpoints  # type: list[dict]
+        self.da.pause()
+
         for ibp in ibps:
             try:
                 self.da.inst_break_add(ibp.get('instructionReference'), '')
@@ -849,6 +854,8 @@ class CommandProcessor(object):
                 ibp.update({'verified': 'false'})
                 ibp.update({{'message': e}})
                 log.debug_exception(e)
+
+        # self.da.resume_exec()
         kwargs = {'body': schema.SetInstructionBreakpointsResponseBody(breakpoints=request.arguments.breakpoints)}
         response = base_schema.build_response(request, kwargs)
         response.success = True
