@@ -389,7 +389,7 @@ class CommandProcessor(object):
         except Exception as e:
             success = False  # type: bool
             log.debug_exception(e)
-            kwargs = {'body': schema.ErrorResponseBody(e)}
+            kwargs = {'body': schema.ErrorResponseBody(error=dict(e))}
         response = base_schema.build_response(request, kwargs)
         response.success = success
         self.write_message(response)
@@ -417,7 +417,7 @@ class CommandProcessor(object):
         except Exception as e:
             success = False
             log.debug_exception(e)
-            kwargs = {'body': schema.ErrorResponseBody(e)}
+            kwargs = {'body': schema.ErrorResponseBody(error=dict(e))}
         response = base_schema.build_response(request, kwargs)
         response.success = success
         self.write_message(response)
@@ -476,7 +476,7 @@ class CommandProcessor(object):
                 response.success = True
             except Exception as e:
                 log.debug_exception(e)
-                kwargs = {'body': schema.ErrorResponseBody(e)}
+                kwargs = {'body': schema.ErrorResponseBody(error=dict(e))}
                 response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
                 response.success = False
             self.write_message(response)
@@ -598,7 +598,7 @@ class CommandProcessor(object):
             self.write_message(response)
         except Exception as e:
             log.debug_exception(e)
-            kwargs = {'body': schema.ErrorResponseBody(e)}
+            kwargs = {'body': schema.ErrorResponseBody(error=dict(e))}
             response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
             response.success = False
             self.write_message(response)
@@ -622,7 +622,7 @@ class CommandProcessor(object):
                 self.da.adapter_restart()
         except Exception as e:
             log.debug_exception(e)
-            kwargs = {'body': schema.ErrorResponseBody(e)}
+            kwargs = {'body': schema.ErrorResponseBody(error=dict(e))}
             response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
             response.success = False
             self.write_message(response)
@@ -646,7 +646,7 @@ class CommandProcessor(object):
                 self.generate_StoppedEvent(reason='pause', thread_id=int(thread_id), all_threads_stopped=True)
             except Exception as e:
                 log.debug_exception(e)
-                kwargs = {'body': schema.ErrorResponseBody(e)}
+                kwargs = {'body': schema.ErrorResponseBody(error=dict(e))}
                 response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
                 response.success = False
                 self.write_message(response)
@@ -756,7 +756,7 @@ class CommandProcessor(object):
                 m.stop_n_check(0.5, "The step operation took too long")
             except Exception as e:
                 log.debug_exception(e)
-                kwargs = {'body': schema.ErrorResponseBody(e)}
+                kwargs = {'body': schema.ErrorResponseBody(error=dict(e))}
                 response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
                 response.success = False
                 self.write_message(response)
@@ -783,7 +783,7 @@ class CommandProcessor(object):
                     self.generate_StoppedEvent(reason='step', thread_id=thread_id, all_threads_stopped=True)
             except Exception as e:
                 log.debug_exception(e)
-                kwargs = {'body': schema.ErrorResponseBody(e)}
+                kwargs = {'body': schema.ErrorResponseBody(error=dict(e))}
                 response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
                 response.success = False
                 self.write_message(response)
@@ -810,7 +810,7 @@ class CommandProcessor(object):
                 self.write_message(response)
             except Exception as e:
                 log.debug_exception(e)
-                kwargs = {'body': schema.ErrorResponseBody(e)}
+                kwargs = {'body': schema.ErrorResponseBody(error=dict(e))}
                 response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
                 response.success = False
                 self.write_message(response)
@@ -833,7 +833,7 @@ class CommandProcessor(object):
             self.write_message(response)
         except Exception as e:
             log.debug_exception(e)
-            kwargs = {'body': schema.ErrorResponseBody(e)}
+            kwargs = {'body': schema.ErrorResponseBody(error=dict(e))}
             response = base_schema.build_response(request, kwargs=kwargs)  # type: schema.ErrorResponse
             response.success = False
             self.write_message(response)
